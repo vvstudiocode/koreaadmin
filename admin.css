@@ -1,0 +1,733 @@
+:root {
+    --bg-dark: #1a1a1a;
+    --bg-light: #f4f6f8;
+    --white: #ffffff;
+    --primary: #333;
+    --accent: #D68C94;
+    /* 延續前台的粉色主調，但用在後台做強調色 */
+    --text-main: #333;
+    --text-secondary: #666;
+    --border: #e1e4e8;
+    --success: #28a745;
+    --warning: #ffc107;
+    --danger: #dc3545;
+    --info: #17a2b8;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Noto Sans TC', sans-serif;
+}
+
+body {
+    background-color: var(--bg-light);
+    color: var(--text-main);
+    height: 100vh;
+    overflow: hidden;
+    /* 儀表板通常不讓整個 body 捲動 */
+}
+
+/* 登入頁面 */
+.login-container {
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+}
+
+.login-box {
+    background: var(--white);
+    padding: 3rem;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.login-box h2 {
+    margin-bottom: 2rem;
+    color: var(--primary);
+}
+
+.form-group input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    margin-bottom: 1.5rem;
+    font-size: 1rem;
+}
+
+.login-box button {
+    width: 100%;
+    padding: 12px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.login-box button:hover {
+    background: var(--accent);
+}
+
+.error-msg {
+    color: var(--danger);
+    margin-top: 1rem;
+    font-size: 0.9rem;
+}
+
+/* 儀表板佈局 */
+.dashboard-container {
+    display: flex;
+    height: 100vh;
+}
+
+/* 側邊欄 */
+.sidebar {
+    width: 250px;
+    background: var(--bg-dark);
+    color: var(--white);
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nav-links {
+    list-style: none;
+    padding: 1rem 0;
+    flex-grow: 1;
+}
+
+.nav-links li {
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    transition: 0.2s;
+    color: #aaa;
+}
+
+.nav-links li:hover,
+.nav-links li.active {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--white);
+    border-left: 4px solid var(--accent);
+}
+
+.sidebar-footer {
+    padding: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-footer button {
+    width: 100%;
+    padding: 8px;
+    background: transparent;
+    border: 1px solid #555;
+    color: #aaa;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.sidebar-footer button:hover {
+    border-color: var(--white);
+    color: var(--white);
+}
+
+/* 主內容區 */
+.main-content {
+    flex-grow: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.top-bar {
+    background: var(--white);
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+}
+
+.refresh-btn {
+    background: white;
+    border: 1px solid var(--border);
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.refresh-btn:hover {
+    background: #f8f9fa;
+    border-color: #ccc;
+}
+
+.view-section {
+    padding: 2rem;
+    overflow-y: auto;
+    flex-grow: 1;
+}
+
+/* 表格樣式 */
+.table-container {
+    background: var(--white);
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 800px;
+}
+
+.data-table th,
+.data-table td {
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.data-table th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.data-table tr:hover {
+    background: #f9f9f9;
+}
+
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.status-pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-confirmed,
+.status-已確認 {
+    background: #cce5ff;
+    color: #004085;
+}
+
+.status-shipped,
+.status-已出貨 {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-completed,
+.status-已完成 {
+    background: #c3e6cb;
+    color: #155724;
+}
+
+/* 稍微深一點 */
+.status-cancelled,
+.status-已取消,
+.status-cancel {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.action-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.action-btn:hover {
+    background: var(--bg-light);
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    width: 400px;
+    max-width: 90%;
+}
+
+.modal-content h3 {
+    margin-bottom: 1rem;
+}
+
+.modal-content select {
+    width: 100%;
+    padding: 10px;
+    margin: 1rem 0;
+    font-size: 1rem;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+.modal-actions button {
+    padding: 8px 16px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: white;
+    cursor: pointer;
+}
+
+.modal-actions button.accent-btn {
+    background: var(--primary);
+    color: white;
+    border: none;
+}
+
+/* V2 Upgrade Styles */
+
+/* 儀表板卡片 */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    border-left: 4px solid var(--accent);
+}
+
+.stat-card.highlight {
+    border-left-color: var(--success);
+    background: #f0fdf4;
+}
+
+.stat-card h3 {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+/* 工具列 */
+.toolbar {
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.add-btn {
+    background: var(--accent);
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.add-btn:hover {
+    opacity: 0.9;
+}
+
+/* Modal 擴充 */
+.large-modal {
+    width: 650px;
+    max-width: 95%;
+    display: flex;
+    flex-direction: column;
+    height: 85vh;
+    /* 固定高度，強制啟動 flex 計算 */
+    max-height: 85vh;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    /* 防止外層捲動 */
+}
+
+.modal-header {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    background: #fff;
+}
+
+/* 讓 Form 佔據剩餘空間並成為 Flex Container */
+#productForm {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    /* 關鍵: 允許 flex item 縮小過內容 */
+    overflow: hidden;
+}
+
+.modal-body {
+    flex: 1;
+    overflow-y: auto;
+    /* 內容捲動 */
+    padding: 1.5rem;
+    padding-bottom: 1rem;
+}
+
+.modal-actions {
+    flex-shrink: 0;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    background: #f9f9f9;
+}
+
+/* 按鈕修正 */
+#batchActions {
+    display: flex;
+    align-items: center;
+}
+
+#batchActions button:disabled,
+#productBatchActions button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+/* 新增/編輯商品表單樣式優化 */
+.form-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.form-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group.half {
+    flex: 0 0 calc(50% - 0.5rem);
+}
+
+.form-group.quarter {
+    flex: 0 0 calc(25% - 0.75rem);
+}
+
+.form-group label {
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.95rem;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.form-group small {
+    margin-top: 0.25rem;
+    font-size: 0.85rem;
+    color: #888;
+}
+
+/* 訂單詳情樣式 */
+.detail-section {
+    margin-bottom: 1.5rem;
+}
+
+.detail-section h4 {
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--border);
+    color: var(--text);
+}
+
+.detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.detail-table th,
+.detail-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.detail-table th {
+    background: var(--bg-light);
+    font-weight: 600;
+}
+
+.detail-total {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: var(--bg-light);
+    border-radius: 4px;
+    text-align: right;
+}
+
+.detail-total p {
+    margin: 0.5rem 0;
+}
+
+.detail-total .grand-total {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.note-box {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    resize: vertical;
+}
+
+.store-info-group {
+    margin-top: 1rem;
+}
+
+/* ========================================
+   MOBILE RESPONSIVE STYLES
+   ======================================== */
+
+@media (max-width: 1024px) {
+    .dashboard-container {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+    }
+
+    .sidebar-header {
+        padding: 1rem;
+    }
+
+    .nav-links {
+        flex-direction: row;
+        overflow-x: auto;
+        padding: 0.5rem 1rem;
+    }
+
+    .nav-links li {
+        white-space: nowrap;
+        padding: 0.75rem 1.5rem;
+    }
+
+    .sidebar-footer {
+        padding: 1rem;
+    }
+
+    .main-content {
+        margin-left: 0;
+        padding: 1rem;
+    }
+
+    .top-bar {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+
+    .header-actions {
+        width: 100%;
+        flex-direction: column;
+    }
+
+    #batchActions {
+        width: 100%;
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+
+    #batchActions button {
+        width: 100%;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    .data-table {
+        font-size: 0.85rem;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 0.5rem;
+    }
+
+    .toolbar {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    #productBatchActions {
+        width: 100%;
+        flex-direction: column !important;
+        margin-left: 0 !important;
+    }
+
+    #productBatchActions button {
+        width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .large-modal {
+        width: 95%;
+        max-width: 95%;
+        height: 95vh;
+        max-height: 95vh;
+    }
+
+    .modal-header {
+        padding: 1rem;
+    }
+
+    .modal-body {
+        padding: 1rem;
+    }
+
+    .modal-actions {
+        padding: 1rem;
+        flex-direction: column;
+    }
+
+    .modal-actions button {
+        width: 100%;
+    }
+
+    .form-row {
+        flex-direction: column;
+    }
+
+    .form-group.half,
+    .form-group.quarter {
+        flex: 1;
+    }
+
+    .detail-table {
+        font-size: 0.85rem;
+    }
+
+    .detail-table th,
+    .detail-table td {
+        padding: 0.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .login-container {
+        padding: 1rem;
+    }
+
+    .login-box {
+        padding: 1.5rem;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 0.4rem;
+        font-size: 0.8rem;
+    }
+
+    .action-btn {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.85rem;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+    }
+}
+
+/* 系統設定卡片 */
+.settings-card {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    max-width: 500px;
+}
+
+.settings-card h3 {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+}

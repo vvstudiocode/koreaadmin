@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OMO Select - 後台管理系統</title>
+    <link rel="stylesheet" href="admin.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+
+    <!-- 登入頁面 -->
+    <div id="loginPage" class="login-container">
+        <div class="login-box">
+            <h2>CMS 後台管理</h2>
+            <div class="form-group">
+                <input type="password" id="adminPassword" placeholder="請輸入管理員密碼">
+            </div>
+            <button onclick="handleLogin()" id="loginBtn">登入</button>
+            <p id="loginError" class="error-msg"></p>
+        </div>
+    </div>
+
+    <!-- 管理儀表板 -->
+    <div id="dashboardPage" class="dashboard-container" style="display: none;">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h3>OMO ADMIN</h3>
+            </div>
+            <ul class="nav-links">
+                <li id="tab-dashboard" class="active" onclick="switchTab('dashboard')">總覽報表</li>
+                <li id="tab-orders" onclick="switchTab('orders')">訂單管理</li>
+                <li id="tab-products" onclick="switchTab('products')">商品管理</li>
+            </ul>
+            <div class="sidebar-footer">
+                <button onclick="logout()">登出</button>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <header class="top-bar">
+                <h2 id="pageTitle">總覽報表</h2>
+                <div class="header-actions">
+                    <div id="batchActions" style="display:none; margin-right: 1rem;">
+                        <span id="unsavedChangesMsg"
+                            style="color: #d9534f; font-size: 0.9rem; margin-right: 10px;"></span>
+                        <button onclick="saveBatchChanges()" class="accent-btn">💾 儲存所有變更</button>
+                    </div>
+                    <button onclick="refreshData()" class="refresh-btn">🔄 重新整理</button>
+                </div>
+            </header>
+
+            <!-- 1. 儀表板視圖 -->
+            <div id="dashboardView" class="view-section">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>總營業額</h3>
+                        <p class="stat-value" id="statRevenue">NT$ 0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>預估總成本</h3>
+                        <p class="stat-value" id="statCost">NT$ 0</p>
+                    </div>
+                    <div class="stat-card highlight">
+                        <h3>預估毛利</h3>
+                        <p class="stat-value" id="statProfit">NT$ 0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>總訂單數</h3>
+                        <p class="stat-value" id="statOrders">0</p>
+                        <small>待處理: <span id="statPending">0</span></small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. 訂單管理視圖 -->
+            <div id="ordersView" class="view-section" style="display: none;">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>訂單編號</th>
+                                <th>狀態 (點擊修改)</th>
+                                <th>日期</th>
+                                <th>客戶</th>
+                                <th>總額</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ordersTableBody">
+                            <tr>
+                                <td colspan="6" class="loading-cell">載入中...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <small style="margin-top:10px; display:block; color:#666;">💡 提示：修改狀態後，請按右上角「儲存所有變更」才會生效。</small>
+            </div>
+
+            <!-- 3. 商品管理視圖 -->
+            <div id="productsView" class="view-section" style="display: none;">
+                <div class="toolbar">
+                    <button class="add-btn" onclick="openProductModal()">+ 新增商品</button>
+                    <!-- 商品批次儲存區 -->
+                    <div id="productBatchActions" style="display:inline-flex; align-items:center; margin-left: 1rem;">
+                        <span id="unsavedProductsMsg"
+                            style="color: #d9534f; font-size: 0.9rem; margin-right: 10px;"></span>
+                        <button onclick="saveProductBatchChanges()" class="accent-btn" disabled>💾 儲存商品變更</button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th width="60">圖片</th>
+                                <th>名稱</th>
+                                <th>售價</th>
+                                <th>成本(NT)</th>
+                                <th>原價(KRW)</th>
+                                <th>庫存</th>
+                                <th>狀態</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productsTableBody">
+                            <tr>
+                                <td colspan="8" class="loading-cell">載入中...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 訂單詳情 Modal (可編輯版) -->
+    <div id="orderDetailModal" class="modal">
+        <div class="modal-content large-modal">
+            <div class="modal-header">
+                <h3>訂單詳情 <span id="detailOrderId"></span></h3>
+                <button class="close-btn" onclick="closeModal('orderDetailModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-section">
+                    <h4>客戶資訊 (可編輯)</h4>
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label>客戶姓名</label>
+                            <input type="text" id="detailName">
+                        </div>
+                        <div class="form-group half">
+                            <label>電話</label>
+                            <input type="text" id="detailPhone">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label>Email</label>
+                            <input type="text" id="detailEmail">
+                        </div>
+                        <div class="form-group half">
+                            <label>Line ID</label>
+                            <input type="text" id="detailLine">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <h4>運送資訊 (可編輯)</h4>
+                    <div class="form-group">
+                        <label>運送方式</label>
+                        <select id="detailShipping">
+                            <option value="7-11店到店">7-11店到店</option>
+                            <option value="宅配">宅配</option>
+                        </select>
+                    </div>
+
+                    <div id="detailStoreInfo" class="store-info-group">
+                        <div class="form-row">
+                            <div class="form-group half">
+                                <label>門市名稱</label>
+                                <input type="text" id="detailStoreName">
+                            </div>
+                            <div class="form-group half">
+                                <label>門市店號</label>
+                                <input type="text" id="detailStoreCode">
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 通用地址欄位 -->
+                    <div class="form-group">
+                        <label>地址 (門市或宅配)</label>
+                        <input type="text" id="detailStoreAddress">
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <h4>商品明細</h4>
+                    <table class="detail-table">
+                        <thead>
+                            <tr>
+                                <th>商品</th>
+                                <th>規格</th>
+                                <th>數量</th>
+                                <th>小計</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detailItemsBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="detail-total">
+                    <p><strong>運費:</strong> NT$ <span id="detailShippingFee"></span></p>
+                    <p class="grand-total"><strong>總計:</strong> NT$ <span id="detailTotal"></span></p>
+                </div>
+
+                <div class="detail-section">
+                    <h4>備註 (可編輯)</h4>
+                    <textarea id="detailNote" class="note-box" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button onclick="closeModal('orderDetailModal')">取消</button>
+                <button onclick="saveOrderDetailToBatch()" class="accent-btn">確認修改 (暫存)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 商品編輯 Modal -->
+    <div id="productModal" class="modal">
+        <div class="modal-content large-modal">
+            <div class="modal-header">
+                <h3>編輯商品</h3>
+                <button class="close-btn" onclick="closeModal('productModal')">✕</button>
+            </div>
+
+            <form id="productForm" onsubmit="handleProductSubmit(event)"
+                style="display:flex; flex-direction:column; height:100%;">
+                <div class="modal-body">
+                    <input type="hidden" id="prodId">
+
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label>商品名稱 *</label>
+                            <input type="text" id="prodName" required>
+                        </div>
+                        <div class="form-group half">
+                            <label>分類</label>
+                            <input type="text" id="prodCategory" list="categoryList">
+                            <datalist id="categoryList">
+                                <option value="流行服飾">
+                                <option value="美妝保養">
+                                <option value="零食食品">
+                                <option value="生活用品">
+                            </datalist>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group quarter">
+                            <label>台幣售價 *</label>
+                            <input type="number" id="prodPrice" required>
+                        </div>
+                        <div class="form-group quarter">
+                            <label>韓幣原價</label>
+                            <input type="number" id="prodPriceKrw" placeholder="₩">
+                        </div>
+                        <!-- 內嵌匯率輸入 -->
+                        <div class="form-group quarter">
+                            <label>匯率 (÷)</label>
+                            <input type="number" id="prodExchangeRate" placeholder="例如 49">
+                        </div>
+                        <div class="form-group quarter">
+                            <label>成本 (台幣)</label>
+                            <input type="number" id="prodCost" placeholder="自動計算">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group quarter">
+                            <label>庫存</label>
+                            <input type="number" id="prodStock" value="99">
+                        </div>
+                        <div class="form-group quarter">
+                            <label>狀態</label>
+                            <select id="prodStatus">
+                                <option value="上架">上架</option>
+                                <option value="下架">下架</option>
+                            </select>
+                        </div>
+                        <div class="form-group half"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>描述</label>
+                        <textarea id="prodDesc" rows="3"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>圖片 URL</label>
+                        <input type="text" id="prodImage" placeholder="https://...">
+                        <small>多張圖片請用逗號分隔</small>
+                    </div>
+                    <div class="form-group">
+                        <label>規格設定 (JSON 格式)</label>
+                        <textarea id="prodOptions" rows="2"
+                            placeholder='{"顏色": ["紅", "藍"], "尺寸": ["S", "M"]}'></textarea>
+                    </div>
+                </div> <!-- End modal-body -->
+
+                <div class="modal-actions">
+                    <button type="button" onclick="closeModal('productModal')">取消</button>
+                    <button type="submit" class="accent-btn">儲存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+
+</html>
