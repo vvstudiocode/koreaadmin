@@ -98,11 +98,21 @@ function switchTab(tabId) {
     } else if (tabId === 'products') {
         document.getElementById('productsView').style.display = 'block';
         document.getElementById('pageTitle').textContent = '商品管理';
-        // 這裡不一定要每次 fetch，如果有 pending 的話，應該基於 currentProducts 渲染
         if (currentProducts.length === 0) fetchProducts();
         else renderProducts(currentProducts);
 
         updateProductBatchUI();
+    }
+
+    // 手機版：選完分頁後自動收起側邊欄
+    if (window.innerWidth <= 1024) {
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.querySelector('.sidebar-overlay');
+        if (sidebar && sidebar.classList.contains('active')) {
+            sidebar.classList.remove('active');
+            if (overlay) overlay.classList.remove('active');
+            document.body.classList.remove('sidebar-open');
+        }
     }
 }
 
@@ -128,7 +138,22 @@ function updateDashboardStats(stats) {
     document.getElementById('statProfit').textContent = formatCurrency(stats.grossProfit);
     document.getElementById('statOrders').textContent = stats.totalOrders;
     document.getElementById('statPending').textContent = stats.pendingOrders;
+
+    // 計算毛利率
+    const profitMargin = stats.totalRevenue > 0
+        ? ((stats.grossProfit / stats.totalRevenue) * 100).toFixed(1)
+        : 0;
+    document.getElementById('statProfitMargin').textContent = `毛利率: ${profitMargin}%`;
 }
+
+// 日期篩選（未來可擴展）
+function filterDashboardByDate(range) {
+    // 目前顯示全部資料
+    // 未來可以根據 range 值篩選訂單
+    console.log('篩選範圍:', range);
+    // refreshData(); // 可以加上篩選邏輯
+}
+
 
 // ----------------------
 // 訂單管理
