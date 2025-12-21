@@ -62,23 +62,52 @@
 
             <!-- 1. 儀表板視圖 -->
             <div id="dashboardView" class="view-section">
+                <div class="dashboard-controls">
+                    <div class="date-filter">
+                        <label for="dateRange">統計範圍：</label>
+                        <select id="dateRange" onchange="filterDashboardByDate(this.value)">
+                            <option value="all">全部</option>
+                            <option value="today">今日</option>
+                            <option value="week">近7天</option>
+                            <option value="month" selected>本月</option>
+                            <option value="year">今年</option>
+                        </select>
+                    </div>
+                    <button onclick="refreshData()" class="icon-btn">🔄</button>
+                </div>
+
                 <div class="stats-grid">
-                    <div class="stat-card">
-                        <h3>總營業額</h3>
-                        <p class="stat-value" id="statRevenue">NT$ 0</p>
+                    <div class="stat-card revenue">
+                        <div class="stat-icon"></div>
+                        <div class="stat-info">
+                            <h3>總營業額</h3>
+                            <p class="stat-value" id="statRevenue">NT$ 0</p>
+                            <small class="stat-trend">已確認訂單</small>
+                        </div>
                     </div>
-                    <div class="stat-card">
-                        <h3>預估總成本</h3>
-                        <p class="stat-value" id="statCost">NT$ 0</p>
+                    <div class="stat-card cost">
+                        <div class="stat-icon"></div>
+                        <div class="stat-info">
+                            <h3>預估總成本</h3>
+                            <p class="stat-value" id="statCost">NT$ 0</p>
+                            <small class="stat-trend">商品成本統計</small>
+                        </div>
                     </div>
-                    <div class="stat-card highlight">
-                        <h3>預估毛利</h3>
-                        <p class="stat-value" id="statProfit">NT$ 0</p>
+                    <div class="stat-card profit highlight">
+                        <div class="stat-icon"></div>
+                        <div class="stat-info">
+                            <h3>預估毛利</h3>
+                            <p class="stat-value" id="statProfit">NT$ 0</p>
+                            <small class="stat-trend" id="statProfitMargin">毛利率: 0%</small>
+                        </div>
                     </div>
-                    <div class="stat-card">
-                        <h3>總訂單數</h3>
-                        <p class="stat-value" id="statOrders">0</p>
-                        <small>待處理: <span id="statPending">0</span></small>
+                    <div class="stat-card orders">
+                        <div class="stat-icon">📦</div>
+                        <div class="stat-info">
+                            <h3>訂單統計</h3>
+                            <p class="stat-value" id="statOrders">0</p>
+                            <small class="stat-trend">待處理: <span id="statPending">0</span></small>
+                        </div>
                     </div>
                 </div>
             </div>
