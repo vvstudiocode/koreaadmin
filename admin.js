@@ -505,3 +505,20 @@ function openModal(id) {
 function closeModal(id) {
     document.getElementById(id).style.display = 'none';
 }
+
+// 手機版側邊欄切換
+function toggleSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.querySelector('.sidebar-overlay');
+
+    if (!overlay) {
+        const newOverlay = document.createElement('div');
+        newOverlay.className = 'sidebar-overlay';
+        newOverlay.onclick = toggleSidebar;
+        document.body.appendChild(newOverlay);
+    }
+
+    sidebar.classList.toggle('active');
+    document.querySelector('.sidebar-overlay').classList.toggle('active');
+    document.body.classList.toggle('sidebar-open');
+}
