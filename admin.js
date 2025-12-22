@@ -385,12 +385,37 @@ function renderProducts(products) {
     `).join('');
 }
 
+// 載入現有品牌列表 (用於自動完成)
+function loadBrandList() {
+    // 從 currentProducts 提取所有不重複的品牌
+    const brands = new Set();
+
+    currentProducts.forEach(p => {
+        if (p.brand && p.brand.trim()) {
+            brands.add(p.brand.trim());
+        }
+    });
+
+    // 更新 datalist
+    const datalist = document.getElementById('brandList');
+    if (datalist) {
+        datalist.innerHTML = Array.from(brands)
+            .sort()
+            .map(brand => `<option value="${brand}">`)
+            .join('');
+    }
+}
+
 function openProductModal(productId = null) {
     const form = document.getElementById('productForm');
     form.reset();
 
     document.getElementById('prodId').value = '';
     document.getElementById('prodExchangeRate').value = '';
+    document.getElementById('prodBrand').value = '';
+
+    // 載入品牌列表
+    loadBrandList();
 
     // 嘗試從 pending 或 current 找
     let p = null;
@@ -405,6 +430,7 @@ function openProductModal(productId = null) {
             document.getElementById('prodId').value = p.id;
             document.getElementById('prodName').value = p.name;
             document.getElementById('prodCategory').value = p.category;
+            document.getElementById('prodBrand').value = p.brand || '';
             document.getElementById('prodPrice').value = p.price;
             document.getElementById('prodCost').value = p.cost;
             document.getElementById('prodPriceKrw').value = p.priceKrw || 0;
@@ -440,10 +466,13 @@ function handleProductSubmit(e) {
     const productId = document.getElementById('prodId').value;
 
     let options = {};
-    try {
-        options = JSON.parse(document.getElementById('prodOptions').value);
-    } catch (e) {
-        alert('規格 JSON 格式錯誤'); return;
+    const optionsStr = document.getElementById('prodOptions').value.trim();
+    if (optionsStr) {
+        try {
+            options = JSON.parse(optionsStr);
+        } catch (e) {
+            alert('規格 JSON 格式錯誤'); return;
+        }
     }
 
     // 建立 Product 物件
@@ -454,6 +483,7 @@ function handleProductSubmit(e) {
         id: tempId,
         name: document.getElementById('prodName').value,
         category: document.getElementById('prodCategory').value,
+        brand: document.getElementById('prodBrand').value.trim() || '',
         price: Number(document.getElementById('prodPrice').value),
         cost: Number(document.getElementById('prodCost').value),
         priceKrw: Number(document.getElementById('prodPriceKrw').value),
@@ -602,6 +632,9 @@ async function uploadImagesToGitHub() {
     const btnText = document.getElementById('uploadBtnText');
     const originalText = btnText.textContent;
 
+    // 取得品牌資訊
+    const brand = document.getElementById('prodBrand').value.trim() || 'default';
+
     btn.disabled = true;
     btnText.textContent = '上傳中... 0%';
 
@@ -616,11 +649,12 @@ async function uploadImagesToGitHub() {
             const base64 = await fileToBase64(file);
             const base64Content = base64.split(',')[1]; // 移除 data:image/...;base64, 前綴
 
-            // 上傳到 GitHub
+            // 上傳到 GitHub (傳遞品牌)
             const result = await callApi('uploadImageToGitHub', {
                 fileName: file.name,
                 content: base64Content,
-                mimeType: file.type
+                mimeType: file.type,
+                brand: brand
             });
 
             if (result.success && result.data.url) {
@@ -644,7 +678,7 @@ async function uploadImagesToGitHub() {
         document.getElementById('imageFileInput').value = '';
         btn.style.display = 'none';
 
-        alert(`成功上傳 ${uploadedUrls.length} 張圖片！`);
+        alert(`成功上傳 ${uploadedUrls.length} 張圖片到 ${brand} 資料夾！`);
 
     } catch (error) {
         console.error('上傳失敗:', error);
