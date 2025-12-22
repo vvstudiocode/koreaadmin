@@ -553,31 +553,38 @@ function updateProductBatchUI() {
     }
 }
 
-function saveProductBatchChanges() {
-    if (pendingProductUpdates.length === 0) return;
+function saveBatchUpdates() {
+    if (Object.keys(pendingUpdates).length === 0) {
+        alert('沒有待儲存的變更');
+        return;
+    }
 
-    const btn = document.querySelector('#productBatchActions button');
-    btn.textContent = '儲存中...';
+    const confirmMsg = `確定要儲存 ${Object.keys(pendingUpdates).length} 筆訂單的變更嗎？`;
+    if (!confirm(confirmMsg)) return;
+
+    const btn = document.getElementById('saveBatchBtn');
     btn.disabled = true;
+    btn.textContent = '儲存中...';
 
-    // 將 NEW_ ID 清除，讓後端生成
-    const updates = pendingProductUpdates.map(p => {
-        if (String(p.id).startsWith('NEW_')) return { ...p, id: null };
-        return p;
-    });
+    console.log('準備儲存的訂單變更:', pendingUpdates);
 
-    callApi('updateProductsBatch', { updates: updates })
+    callApi('updateOrdersBatch', { updates: pendingUpdates })
         .then(data => {
             if (data.success) {
-                alert('所有商品變更已儲存！');
-                pendingProductUpdates = [];
-                // 重新讀取以獲取最新 ID 和狀態
-                fetchProducts();
+                alert(`成功儲存 ${Object.keys(pendingUpdates).length} 筆訂單的變更！`);
+                pendingUpdates = {};
+                updateBatchUI();
+                fetchOrders();
             } else {
-                alert('儲存失敗: ' + data.error);
-                btn.disabled = false;
-                btn.textContent = '💾 儲存商品變更';
+                alert('儲存失敗：' + data.error);
             }
+        })
+        .catch(err => {
+            alert('儲存失敗：' + err);
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.textContent = '💾 儲存所有變更';
         });
 }
 
