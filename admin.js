@@ -95,6 +95,11 @@ function switchTab(tabId) {
         document.getElementById('pageTitle').textContent = '訂單管理';
         renderOrders(currentOrders);
         updateBatchUI();
+
+        // 確保商品列表已載入（新增訂單需要）
+        if (currentProducts.length === 0) {
+            fetchProducts();
+        }
     } else if (tabId === 'products') {
         document.getElementById('productsView').style.display = 'block';
         document.getElementById('pageTitle').textContent = '商品管理';
@@ -262,6 +267,15 @@ function openOrderDetail(orderId) {
 
     const pending = pendingUpdates[orderId] || {};
 
+    currentEditingOrderId = orderId;
+    tempOrderItems = order.items.map(item => ({
+        name: item.name,
+        spec: item.spec || '',
+        qty: item.qty,
+        price: item.price || (item.subtotal / item.qty),
+        subtotal: item.subtotal
+    }));
+
     document.getElementById('detailOrderId').textContent = order.orderId;
 
     document.getElementById('detailName').value = pending.customerName || order.customerName || '';
@@ -280,22 +294,17 @@ function openOrderDetail(orderId) {
     document.getElementById('detailStoreCode').value = order.storeCode || '';
     document.getElementById('detailStoreAddress').value = pending.storeAddress || order.storeAddress || '';
 
-    const itemsHtml = order.items.map(item => `
-        <tr>
-            <td>${item.name}</td>
-            <td>${item.spec || '-'}</td>
-            <td>${item.qty}</td>
-            <td>${formatCurrency(item.subtotal)}</td>
-        </tr>`).join('');
-    document.getElementById('detailItemsBody').innerHTML = itemsHtml;
-
-    document.getElementById('detailShippingFee').textContent = order.shippingFee || 0;
-    document.getElementById('detailTotal').textContent = order.total;
+    renderOrderItems();
+    loadProductSuggestions();
 
     document.getElementById('detailNote').value = pending.note || order.note || '';
 
-    const saveBtn = document.querySelector('#orderDetailModal .accent-btn');
-    saveBtn.onclick = () => saveOrderDetailToBatch(orderId);
+    // 編輯模式：設定最下方的按鈕
+    const saveBtn = document.querySelector('#orderDetailModal .modal-actions .accent-btn');
+    if (saveBtn) {
+        saveBtn.textContent = '確認修改 (暫存)';
+        saveBtn.onclick = () => saveOrderDetailToBatch(orderId);
+    }
 
     openModal('orderDetailModal');
 }
@@ -307,7 +316,9 @@ function saveOrderDetailToBatch(orderId) {
         shippingMethod: document.getElementById('detailShipping').value,
         storeName: document.getElementById('detailStoreName').value,
         storeAddress: document.getElementById('detailStoreAddress').value,
-        note: document.getElementById('detailNote').value
+        note: document.getElementById('detailNote').value,
+        items: tempOrderItems,
+        total: parseInt(document.getElementById('detailTotal').textContent)
     };
 
     if (!pendingUpdates[orderId]) pendingUpdates[orderId] = {};
@@ -750,4 +761,251 @@ function toggleSidebar() {
     sidebar.classList.toggle('active');
     document.querySelector('.sidebar-overlay').classList.toggle('active');
     document.body.classList.toggle('sidebar-open');
+}
+
+// ----------------------
+// 手動訂單管理
+// ----------------------
+let currentEditingOrderId = null;
+let tempOrderItems = [];
+
+function openCreateOrderModal() {
+    currentEditingOrderId = null;
+    tempOrderItems = [];
+
+    // 確保商品已載入
+    if (currentProducts.length === 0) {
+        alert('正在載入商品資料，請稍後再試');
+        fetchProducts();
+        return;
+    }
+
+    console.log('建立新訂單，可用商品數:', currentProducts.length);
+
+    document.getElementById('detailOrderId').textContent = '(新訂單)';
+    document.getElementById('detailName').value = '';
+    document.getElementById('detailPhone').value = '';
+    document.getElementById('detailEmail').value = '';
+    document.getElementById('detailLine').value = '';
+    document.getElementById('detailShipping').value = '7-11店到店';
+    document.getElementById('detailStoreName').value = '';
+    document.getElementById('detailStoreCode').value = '';
+    document.getElementById('detailStoreAddress').value = '';
+    document.getElementById('detailNote').value = '';
+
+    renderOrderItems();
+    loadProductSuggestions();
+
+    // 設定最下方的提交按鈕
+    const saveBtn = document.querySelector('#orderDetailModal .modal-actions .accent-btn');
+    if (saveBtn) {
+        saveBtn.textContent = '建立訂單';
+        saveBtn.onclick = () => submitManualOrder();
+    }
+
+    openModal('orderDetailModal');
+}
+
+function loadProductSuggestions() {
+    const select = document.getElementById('productSearch');
+    if (!select) return;
+
+    // 清空並重新載入
+    select.innerHTML = '<option value="">-- 請選擇商品 --</option>';
+
+    currentProducts.forEach(p => {
+        const option = document.createElement('option');
+        option.value = p.name;
+        option.textContent = `${p.name} - NT$ ${p.price}`;
+        option.dataset.price = p.price;
+        option.dataset.id = p.id;
+        select.appendChild(option);
+    });
+}
+
+function filterProducts(query) {
+    // 使用 select 時不需要 filter
+    loadProductSuggestions();
+}
+
+function openAddProductToOrder() {
+    const area = document.getElementById('addProductArea');
+    if (!area) {
+        console.error('找不到 addProductArea');
+        return;
+    }
+
+    // 重新載入商品清單
+    loadProductSuggestions();
+
+    // 重置表單
+    const select = document.getElementById('productSearch');
+    if (select) select.value = '';
+
+    const qtyInput = document.getElementById('productQty');
+    if (qtyInput) qtyInput.value = 1;
+
+    // 顯示區域
+    area.style.display = 'block';
+
+    console.log('開啟新增商品區域，商品數量:', currentProducts.length);
+}
+
+function cancelAddProduct() {
+    const area = document.getElementById('addProductArea');
+    if (area) {
+        area.style.display = 'none';
+    }
+}
+
+function addProductToOrderItems() {
+    const select = document.getElementById('productSearch');
+    const productName = select.value.trim();
+    const qty = parseInt(document.getElementById('productQty').value) || 1;
+
+    console.log('嘗試新增商品:', productName, '數量:', qty);
+
+    if (!productName) {
+        alert('請選擇商品');
+        return;
+    }
+
+    const product = currentProducts.find(p => p.name === productName);
+    if (!product) {
+        alert('找不到此商品');
+        console.error('商品列表:', currentProducts);
+        return;
+    }
+
+    console.log('找到商品:', product);
+
+    // 檢查是否已存在
+    const existing = tempOrderItems.find(item => item.name === productName);
+    if (existing) {
+        existing.qty += qty;
+        existing.subtotal = existing.price * existing.qty;
+        console.log('更新現有商品數量');
+    } else {
+        tempOrderItems.push({
+            name: product.name,
+            spec: '',
+            qty: qty,
+            price: product.price,
+            subtotal: product.price * qty
+        });
+        console.log('新增商品到列表');
+    }
+
+    console.log('目前商品列表:', tempOrderItems);
+
+    // 立即更新顯示
+    renderOrderItems();
+
+    // 關閉新增區域
+    cancelAddProduct();
+
+    console.log('商品新增完成');
+}
+
+function removeOrderItem(index) {
+    if (confirm('確定刪除此商品？')) {
+        tempOrderItems.splice(index, 1);
+        renderOrderItems();
+    }
+}
+
+function renderOrderItems() {
+    const tbody = document.getElementById('detailItemsBody');
+    console.log('renderOrderItems 被調用，商品數量:', tempOrderItems.length);
+
+    if (tempOrderItems.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999;">尚未新增商品</td></tr>';
+        document.getElementById('detailShippingFee').textContent = 0;
+        document.getElementById('detailTotal').textContent = 0;
+        return;
+    }
+
+    tbody.innerHTML = tempOrderItems.map((item, index) => `
+        <tr>
+            <td>${item.name}</td>
+            <td>${item.spec || '-'}</td>
+            <td>${item.qty}</td>
+            <td>${formatCurrency(item.subtotal)}</td>
+            <td><button class="action-btn" onclick="removeOrderItem(${index})" style="background:#dc3545;color:white;">刪除</button></td>
+        </tr>
+    `).join('');
+
+    const itemsTotal = tempOrderItems.reduce((sum, item) => sum + item.subtotal, 0);
+    const shippingMethod = document.getElementById('detailShipping').value;
+    const shippingFee = shippingMethod === '7-11店到店' ? 60 : 0;
+    const total = itemsTotal + shippingFee;
+
+    document.getElementById('detailShippingFee').textContent = shippingFee;
+    document.getElementById('detailTotal').textContent = total;
+
+    console.log('商品明細已更新，總額:', total);
+
+    // 確保新增商品區域狀態正確
+    const addArea = document.getElementById('addProductArea');
+    if (addArea && addArea.style.display === 'block') {
+        // 如果正在新增，保持開啟
+    } else if (addArea) {
+        addArea.style.display = 'none';
+    }
+}
+
+function submitManualOrder() {
+    if (tempOrderItems.length === 0) {
+        alert('請至少新增一個商品');
+        return;
+    }
+
+    const customerName = document.getElementById('detailName').value.trim();
+    const customerPhone = document.getElementById('detailPhone').value.trim();
+
+    if (!customerName || !customerPhone) {
+        alert('請填寫客戶姓名和電話');
+        return;
+    }
+
+    const orderData = {
+        customer: {
+            name: customerName,
+            phone: customerPhone,
+            email: document.getElementById('detailEmail').value.trim(),
+            lineId: document.getElementById('detailLine').value.trim()
+        },
+        shipping: {
+            method: document.getElementById('detailShipping').value,
+            storeName: document.getElementById('detailStoreName').value.trim(),
+            storeCode: document.getElementById('detailStoreCode').value.trim(),
+            address: document.getElementById('detailStoreAddress').value.trim(),
+            fee: parseInt(document.getElementById('detailShippingFee').textContent)
+        },
+        items: tempOrderItems,
+        total: parseInt(document.getElementById('detailTotal').textContent),
+        note: document.getElementById('detailNote').value.trim()
+    };
+
+    const btn = document.querySelector('#orderDetailModal .accent-btn');
+    btn.disabled = true;
+    btn.textContent = '建立中...';
+
+    callApi('createManualOrder', { orderData: orderData })
+        .then(data => {
+            if (data.success) {
+                alert('訂單建立成功！訂單編號：' + data.data.orderId);
+                closeModal('orderDetailModal');
+                refreshData();
+            } else {
+                alert('建立失敗：' + data.error);
+                btn.disabled = false;
+                btn.textContent = '建立訂單';
+            }
+        })
+        .catch(err => {
+            alert('建立失敗：' + err);
+            btn.disabled = false;
+            btn.textContent = '建立訂單';
+        });
 }
