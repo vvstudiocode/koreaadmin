@@ -460,9 +460,6 @@ body {
     color: rgba(255, 255, 255, 0.85);
 }
 
-color: var(--primary);
-}
-
 /* 工具列 */
 .toolbar {
     display: flex;
