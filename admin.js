@@ -261,6 +261,27 @@ function saveBatchChanges() {
         });
 }
 
+function renderDashboard(orders = currentOrders) {
+    const totalOrders = orders.length;
+    const totalRevenue = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+    const pendingOrders = orders.filter(o => o.status === '待處理' || o.status === '編輯/詳情').length;
+
+    document.querySelector('.stats-container').innerHTML = `
+        <div class="stat-card">
+            <div class="stat-value">${totalOrders}</div>
+            <div class="stat-label">訂單總數</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">NT$ ${formatCurrency(totalRevenue)}</div>
+            <div class="stat-label">總營收</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">${pendingOrders}</div>
+            <div class="stat-label">待處理訂單</div>
+        </div>
+    `;
+}
+
 function openOrderDetail(orderId) {
     const order = currentOrders.find(o => o.orderId === orderId);
     if (!order) return;
@@ -807,25 +828,39 @@ function openCreateOrderModal() {
 }
 
 function loadProductSuggestions() {
-    const select = document.getElementById('productSearch');
-    if (!select) return;
+    const datalist = document.getElementById('productSuggestions');
+    if (!datalist) return;
 
-    // 清空並重新載入
-    select.innerHTML = '<option value="">-- 請選擇商品 --</option>';
+    datalist.innerHTML = currentProducts.map(p =>
+        `<option value="${p.name}">${p.name} - NT$ ${p.price}</option>`
+    ).join('');
 
-    currentProducts.forEach(p => {
-        const option = document.createElement('option');
-        option.value = p.name;
-        option.textContent = `${p.name} - NT$ ${p.price}`;
-        option.dataset.price = p.price;
-        option.dataset.id = p.id;
-        select.appendChild(option);
-    });
+    console.log('載入商品建議:', currentProducts.length, '個商品');
 }
 
 function filterProducts(query) {
-    // 使用 select 時不需要 filter
-    loadProductSuggestions();
+    // datalist 會自動過濾，不需要手動實作
+}
+
+function updateShippingFee() {
+    const shippingMethod = document.getElementById('detailShipping').value;
+    const feeInput = document.getElementById('detailShippingFee');
+
+    if (shippingMethod === '7-11店到店') {
+        feeInput.value = 60;
+    } else {
+        feeInput.value = 0;
+    }
+
+    updateTotal();
+}
+
+function updateTotal() {
+    const itemsTotal = tempOrderItems.reduce((sum, item) => sum + item.subtotal, 0);
+    const shippingFee = parseInt(document.getElementById('detailShippingFee').value) || 0;
+    const total = itemsTotal + shippingFee;
+
+    document.getElementById('detailTotal').textContent = total;
 }
 
 function openAddProductToOrder() {
@@ -920,7 +955,7 @@ function renderOrderItems() {
 
     if (tempOrderItems.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999;">尚未新增商品</td></tr>';
-        document.getElementById('detailShippingFee').textContent = 0;
+        document.getElementById('detailShippingFee').value = 0;
         document.getElementById('detailTotal').textContent = 0;
         return;
     }
@@ -935,15 +970,10 @@ function renderOrderItems() {
         </tr>
     `).join('');
 
-    const itemsTotal = tempOrderItems.reduce((sum, item) => sum + item.subtotal, 0);
-    const shippingMethod = document.getElementById('detailShipping').value;
-    const shippingFee = shippingMethod === '7-11店到店' ? 60 : 0;
-    const total = itemsTotal + shippingFee;
+    // 更新總計
+    updateTotal();
 
-    document.getElementById('detailShippingFee').textContent = shippingFee;
-    document.getElementById('detailTotal').textContent = total;
-
-    console.log('商品明細已更新，總額:', total);
+    console.log('商品明細已更新');
 
     // 確保新增商品區域狀態正確
     const addArea = document.getElementById('addProductArea');
@@ -980,7 +1010,7 @@ function submitManualOrder() {
             storeName: document.getElementById('detailStoreName').value.trim(),
             storeCode: document.getElementById('detailStoreCode').value.trim(),
             address: document.getElementById('detailStoreAddress').value.trim(),
-            fee: parseInt(document.getElementById('detailShippingFee').textContent)
+            fee: parseInt(document.getElementById('detailShippingFee').value) || 0
         },
         items: tempOrderItems,
         total: parseInt(document.getElementById('detailTotal').textContent),
