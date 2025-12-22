@@ -24,6 +24,46 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('prodExchangeRate').addEventListener('input', calculateInlineCost);
 });
 
+// Toast 通知系統
+function showToast(message, type = 'info', duration = 3000) {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.style.cssText = `
+        padding: 12px 20px;
+        margin-bottom: 10px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        animation: slideIn 0.3s ease;
+        cursor: pointer;
+        max-width: 350px;
+    `;
+
+    // 根據類型設定顏色
+    const colors = {
+        success: '#28a745',
+        error: '#dc3545',
+        warning: '#ffc107',
+        info: '#17a2b8'
+    };
+    toast.style.backgroundColor = colors[type] || colors.info;
+    if (type === 'warning') toast.style.color = '#333';
+
+    toast.textContent = message;
+    toast.onclick = () => toast.remove();
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+}
+
 function handleLogin() {
     const passwordInput = document.getElementById('adminPassword');
     const password = passwordInput.value.trim();
@@ -197,6 +237,41 @@ function renderOrders(orders) {
             </td>
         </tr>
     `}).join('');
+}
+
+// 訂單搜尋/篩選
+function filterOrders() {
+    const searchTerm = document.getElementById('orderSearchInput').value.toLowerCase();
+    const statusFilter = document.getElementById('orderStatusFilter').value;
+
+    const filtered = currentOrders.filter(order => {
+        // 搜尋條件
+        const matchSearch = !searchTerm ||
+            order.orderId.toLowerCase().includes(searchTerm) ||
+            (order.customerName || '').toLowerCase().includes(searchTerm) ||
+            (order.customerPhone || '').includes(searchTerm);
+
+        // 狀態篩選
+        const matchStatus = !statusFilter || order.status === statusFilter;
+
+        return matchSearch && matchStatus;
+    });
+
+    renderOrders(filtered);
+}
+
+// 商品搜尋
+function filterProductsList() {
+    const searchTerm = document.getElementById('productSearchInput').value.toLowerCase();
+
+    const filtered = currentProducts.filter(product => {
+        return !searchTerm ||
+            (product.name || '').toLowerCase().includes(searchTerm) ||
+            (product.category || '').toLowerCase().includes(searchTerm) ||
+            (product.brand || '').toLowerCase().includes(searchTerm);
+    });
+
+    renderProducts(filtered);
 }
 
 function getStatusColor(status) {
@@ -625,6 +700,52 @@ function saveBatchUpdates() {
         .finally(() => {
             btn.disabled = false;
             btn.textContent = '💾 儲存所有變更';
+        });
+}
+
+// 商品批次儲存
+function saveProductBatchChanges() {
+    if (pendingProductUpdates.length === 0) {
+        alert('沒有待儲存的商品變更');
+        return;
+    }
+
+    const confirmMsg = `確定要儲存 ${pendingProductUpdates.length} 筆商品的變更嗎？`;
+    if (!confirm(confirmMsg)) return;
+
+    const btn = document.querySelector('#productBatchActions button');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '儲存中...';
+    }
+
+    // 將 NEW_ ID 清除，讓後端生成
+    const updates = pendingProductUpdates.map(p => {
+        if (String(p.id).startsWith('NEW_')) {
+            return { ...p, id: null };
+        }
+        return p;
+    });
+
+    callApi('updateProductsBatch', { updates: updates })
+        .then(data => {
+            if (data.success) {
+                alert(`成功儲存 ${pendingProductUpdates.length} 筆商品的變更！`);
+                pendingProductUpdates = [];
+                updateProductBatchUI();
+                fetchProducts();
+            } else {
+                alert('儲存失敗：' + data.error);
+            }
+        })
+        .catch(err => {
+            alert('儲存失敗：' + err);
+        })
+        .finally(() => {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = '💾 儲存商品變更';
+            }
         });
 }
 
