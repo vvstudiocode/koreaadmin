@@ -236,31 +236,6 @@ function updateBatchUI() {
     }
 }
 
-function saveBatchChanges() {
-    if (Object.keys(pendingUpdates).length === 0) return;
-
-    const updates = Object.keys(pendingUpdates).map(oid => ({
-        orderId: oid,
-        ...pendingUpdates[oid]
-    }));
-
-    const btn = document.querySelector('#batchActions button');
-    btn.textContent = '儲存中...';
-    btn.disabled = true;
-
-    callApi('updateOrdersBatch', { updates: updates })
-        .then(data => {
-            if (data.success) {
-                pendingUpdates = {};
-                refreshData();
-                alert('已成功批次更新！');
-            } else {
-                alert('更新失敗: ' + data.error);
-                btn.disabled = false;
-            }
-        });
-}
-
 function renderDashboard(orders = currentOrders) {
     const totalOrders = orders.length;
     const totalRevenue = orders.reduce((sum, o) => sum + (o.total || 0), 0);
@@ -283,6 +258,8 @@ function renderDashboard(orders = currentOrders) {
 }
 
 function openOrderDetail(orderId) {
+    console.log('openOrderDetail called with orderId:', orderId);
+
     const order = currentOrders.find(o => o.orderId === orderId);
     if (!order) return;
 
@@ -323,6 +300,7 @@ function openOrderDetail(orderId) {
     // 編輯模式：設定最下方的按鈕
     const saveBtn = document.querySelector('#orderDetailModal .modal-actions .accent-btn');
     if (saveBtn) {
+        console.log('Setting saveBtn onclick with orderId:', orderId);
         saveBtn.textContent = '確認修改 (暫存)';
         saveBtn.onclick = () => saveOrderDetailToBatch(orderId);
     }
@@ -342,8 +320,13 @@ function saveOrderDetailToBatch(orderId) {
         total: parseInt(document.getElementById('detailTotal').textContent)
     };
 
-    if (!pendingUpdates[orderId]) pendingUpdates[orderId] = {};
-    Object.assign(pendingUpdates[orderId], updates);
+    console.log('saveOrderDetailToBatch - orderId:', orderId);
+    console.log('saveOrderDetailToBatch - updates:', updates);
+
+    // 確保使用正確的 orderId 作為 key
+    pendingUpdates[orderId] = updates;
+
+    console.log('pendingUpdates after save:', pendingUpdates);
 
     updateBatchUI();
     renderOrders(currentOrders);
@@ -574,7 +557,7 @@ function saveBatchUpdates() {
                 alert(`成功儲存 ${Object.keys(pendingUpdates).length} 筆訂單的變更！`);
                 pendingUpdates = {};
                 updateBatchUI();
-                fetchOrders();
+                refreshData();
             } else {
                 alert('儲存失敗：' + data.error);
             }
