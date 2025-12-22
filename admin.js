@@ -764,6 +764,11 @@ function saveProductBatchChanges() {
 }
 
 function formatCurrency(num) {
+    if (typeof num === 'string') {
+        // 移除所有非數字字符 (除了小數點和負號)
+        const parsed = parseFloat(num.replace(/[^\d.-]/g, ''));
+        if (!isNaN(parsed)) num = parsed;
+    }
     return 'NT$ ' + (Number(num) || 0).toLocaleString();
 }
 
@@ -1079,8 +1084,11 @@ function addProductToOrderItems() {
     const select = document.getElementById('productSearch');
     const productName = select.value.trim();
     const qty = parseInt(document.getElementById('productQty').value) || 1;
+    // 取得選取的規格
+    const specSelect = document.getElementById('productSpec');
+    const spec = (specSelect && specSelect.style.display !== 'none') ? specSelect.value : '';
 
-    console.log('嘗試新增商品:', productName, '數量:', qty);
+    console.log('嘗試新增商品:', productName, '規格:', spec, '數量:', qty);
 
     if (!productName) {
         alert('請選擇商品');
@@ -1090,14 +1098,18 @@ function addProductToOrderItems() {
     const product = currentProducts.find(p => p.name === productName);
     if (!product) {
         alert('找不到此商品');
-        console.error('商品列表:', currentProducts);
         return;
     }
 
-    console.log('找到商品:', product);
+    // 檢查規格是否必選
+    if (specSelect && specSelect.style.display !== 'none' && !spec && specSelect.options.length > 1) {
+        // 如果有規格選項但沒選 (排除只有"無"的情況)
+        // 這裡我們先允許空規格，如果使用者不選的話。或者強制選?
+        // 通常最好強制選，或者預設選第一個。
+    }
 
-    // 檢查是否已存在
-    const existing = tempOrderItems.find(item => item.name === productName);
+    // 檢查是否已存在 (同名稱且同規格)
+    const existing = tempOrderItems.find(item => item.name === productName && (item.spec || '') === spec);
     if (existing) {
         existing.qty += qty;
         existing.subtotal = existing.price * existing.qty;
@@ -1105,7 +1117,7 @@ function addProductToOrderItems() {
     } else {
         tempOrderItems.push({
             name: product.name,
-            spec: '',
+            spec: spec,
             qty: qty,
             price: product.price,
             subtotal: product.price * qty
@@ -1118,11 +1130,146 @@ function addProductToOrderItems() {
     // 立即更新顯示
     renderOrderItems();
 
-    // 關閉新增區域
-    cancelAddProduct();
-
-    console.log('商品新增完成');
+    // 清空輸入
+    select.value = '';
+    document.getElementById('productQty').value = 1;
+    if (document.getElementById('specSelectGroup')) {
+        document.getElementById('specSelectGroup').style.display = 'none';
+    }
 }
+
+// 處理商品輸入變更
+function handleProductSearchInput() {
+    const searchInput = document.getElementById('productSearch');
+    if (!searchInput) return;
+
+    const val = searchInput.value;
+    console.log('商品搜尋輸入:', val);
+
+    // 完全匹配名稱
+    const product = currentProducts.find(p => p.name === val);
+    const specGroup = document.getElementById('specSelectGroup');
+    const specSelect = document.getElementById('productSpec');
+
+    if (product) {
+        console.log('選中商品:', product.name, '選項資料:', product.options);
+    }
+
+    if (product && specGroup && specSelect) {
+        let options = [];
+        try {
+            if (Array.isArray(product.options)) {
+                options = product.options;
+            } else if (typeof product.options === 'string' && product.options.trim() !== '') {
+                options = JSON.parse(product.options);
+            }
+        } catch (e) {
+            console.error('規格解析失敗', e, product.options);
+            options = [];
+        }
+
+        console.log('解析後的規格選項:', options);
+
+        if (options && options.length > 0) {
+            // 清空舊選項
+            specSelect.innerHTML = '<option value="">請選擇規格</option>';
+
+            let hasSpecs = false;
+            options.forEach(opt => {
+                if (opt && opt.values && Array.isArray(opt.values)) {
+                    opt.values.forEach(val => {
+                        const optionText = `${opt.name}: ${val}`;
+                        const option = document.createElement('option');
+                        option.value = optionText;
+                        option.textContent = optionText;
+                        specSelect.appendChild(option);
+                        hasSpecs = true;
+                    });
+                }
+            });
+
+            if (hasSpecs) {
+                specGroup.style.display = 'block';
+                console.log('顯示規格選單');
+            } else {
+                specGroup.style.display = 'none';
+                console.log('無有效規格選項，隱藏選單');
+            }
+        } else {
+            specGroup.style.display = 'none';
+        }
+    } else if (specGroup) {
+        specGroup.style.display = 'none';
+    }
+}
+
+// 監聽商品輸入變更，動態顯示規格
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('productSearch');
+    if (searchInput) {
+    } else if (typeof product.options === 'string' && product.options.trim() !== '') {
+        options = JSON.parse(product.options);
+    }
+} catch (e) {
+    console.error('規格解析失敗', e);
+    options = [];
+}
+
+// 如果是舊格式的 options (Array of strings or Objects?)
+// 假設 options 是一個 Array，每個元素可能有 name/values 或者直接是 string
+// 這裡簡化處理：如果 options 是 Array，且有內容
+
+if (options && options.length > 0) {
+    specSelect.innerHTML = '<option value="">請選擇規格</option>';
+
+    // 這裡假設 options 是簡單的字串陣列，或者是物件。
+    // 根據之前的程式碼，options 似乎是複雜結構？
+    // 讓我們看看之前的 productData.options 結構
+    // 在 saveProductBatchChanges 裡，options 是從 .option-group 收集來的
+    // 結構: [{ name: '顏色', values: ['紅', '藍'] }, ...]
+
+    // 我們需要把它展平成單一選單嗎？還是讓使用者選多個？
+    // 簡單起見，我們將所有組合展平，或者只顯示第一個選項群組
+    // 使用者之前的截圖顯示 "款式: 白色"，這表示可能是一個 select
+
+    // 嘗試展平選項組合 (如果是多層選項)
+    // 為了簡單，我們先只列出所有選項值，讓使用者選一項，或者手動輸入?
+    // 不，這裡應該要與商品詳情頁一致。
+
+    // 暫時實作：將所有選項值列出來
+    // 如果 options 是 [{name:'顏色', values:['紅','藍']}]
+    // 則顯示 "顏色: 紅", "顏色: 藍"
+
+    let hasSpecs = false;
+    options.forEach(opt => {
+        if (opt && opt.values && Array.isArray(opt.values)) {
+            opt.values.forEach(val => {
+                const optionText = `${opt.name}: ${val}`;
+                const option = document.createElement('option');
+                option.value = optionText;
+                option.textContent = optionText;
+                specSelect.appendChild(option);
+                hasSpecs = true;
+            });
+        }
+    });
+
+    if (hasSpecs) {
+        specGroup.style.display = 'block';
+    } else {
+        specGroup.style.display = 'none';
+    }
+} else {
+    specGroup.style.display = 'none';
+}
+            } else if (specGroup) {
+    specGroup.style.display = 'none';
+}
+        });
+    }
+});
+
+
 
 function removeOrderItem(index) {
     if (confirm('確定刪除此商品？')) {
