@@ -208,15 +208,15 @@
                 </div>
 
                 <div class="detail-section">
-                    <h4>運送資訊 (可編輯)</h4>
-                    <div class="form-group">
-                        <label>運送方式</label>
-                        <select id="detailShipping">
-                            <option value="7-11店到店">7-11店到店</option>
-                            <option value="宅配">宅配</option>
-                        </select>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>運送方式</label>
+                            <select id="detailShipping" onchange="updateShippingFee()">
+                                <option value="7-11店到店">7-11店到店 (+60)</option>
+                                <option value="自取">自取 (免運)</option>
+                            </select>
+                        </div>
                     </div>
-
                     <div id="detailStoreInfo" class="store-info-group">
                         <div class="form-row">
                             <div class="form-group half">
@@ -245,11 +245,12 @@
                         style="display:none; margin-bottom:1rem; padding:1rem; background:#f8f9fa; border-radius:4px;">
                         <div class="form-row">
                             <div class="form-group" style="flex:2;">
-                                <label>選擇商品</label>
-                                <select id="productSearch" style="width:100%; padding:0.5rem;">
-                                    <option value="">-- 請選擇商品 --</option>
+                                <label>選擇商品（可輸入搜尋）</label>
+                                <input type="text" id="productSearch" list="productSuggestions" placeholder="輸入或選擇商品..."
+                                    style="width:100%; padding:0.5rem;">
+                                <datalist id="productSuggestions">
                                     <!-- 動態載入 -->
-                                </select>
+                                </datalist>
                             </div>
                             <div class="form-group quarter">
                                 <label>數量</label>
@@ -278,9 +279,19 @@
                     </table>
                 </div>
 
-                <div class="detail-total">
-                    <p><strong>運費:</strong> NT$ <span id="detailShippingFee"></span></p>
-                    <p class="grand-total"><strong>總計:</strong> NT$ <span id="detailTotal"></span></p>
+                <div class="detail-section">
+                    <h4>訂單總計</h4>
+                    <table class="detail-table">
+                        <tr>
+                            <td>運費</td>
+                            <td><input type="number" id="detailShippingFee" value="0" min="0"
+                                    style="width:80px; padding:0.3rem;" oninput="updateTotal()"> 元</td>
+                        </tr>
+                        <tr>
+                            <td><strong>總金額</strong></td>
+                            <td><strong id="detailTotal">0</strong> 元</td>
+                        </tr>
+                    </table>
                 </div>
 
                 <div class="detail-section">
