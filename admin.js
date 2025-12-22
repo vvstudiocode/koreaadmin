@@ -220,9 +220,9 @@ function renderOrders(orders) {
             .join('');
 
         return `
-        <tr class="${isModified ? 'row-modified' : ''}">
+        <tr class="${isModified ? 'row-modified' : ''}" onclick="toggleRowDetails('${order.orderId}')" style="cursor:pointer;">
             <td>${order.orderId}</td>
-            <td>
+            <td onclick="event.stopPropagation()">
                 <select onchange="markOrderUpdated('${order.orderId}', 'status', this.value)" 
                         style="padding: 5px; border-radius: 4px; border: 1px solid #ddd; background: ${getStatusColor(displayStatus)}">
                     ${statusOptions}
@@ -231,12 +231,39 @@ function renderOrders(orders) {
             </td>
             <td>${order.date}</td>
             <td>${order.customerName}</td>
+            <td>${order.shippingMethod || '-'}</td>
             <td>${formatCurrency(order.total)}</td>
-            <td>
-                <button class="action-btn" onclick="openOrderDetail('${order.orderId}')">編輯/詳情</button>
+            <td onclick="event.stopPropagation()">
+                <button class="action-btn" onclick="openOrderDetail('${order.orderId}')">編輯</button>
+            </td>
+        </tr>
+        <tr id="details-${order.orderId}" style="display:none; background-color:#f8f9fa;">
+            <td colspan="7">
+                <div style="padding: 15px;">
+                    <strong>商品明細：</strong>
+                    <ul style="margin: 10px 0; padding-left: 20px;">
+                        ${(order.items || []).map(item => `
+                            <li>${item.name} ${item.spec ? `(${item.spec})` : ''} x ${item.qty} - ${formatCurrency(item.subtotal)}</li>
+                        `).join('')}
+                    </ul>
+                    <div style="margin-top: 10px; display:flex; gap: 20px;">
+                        <span><strong>電話:</strong> ${order.customerPhone || '-'}</span>
+                        <span><strong>運費:</strong> ${order.shippingFee || 0}</span>
+                        <span><strong>備註:</strong> ${order.note || '無'}</span>
+                    </div>
+                    ${order.storeName ? `<div style="margin-top: 5px;"><strong>門市:</strong> ${order.storeName} (${order.storeCode})</div>` : ''}
+                    ${order.storeAddress ? `<div style="margin-top: 5px;"><strong>地址:</strong> ${order.storeAddress}</div>` : ''}
+                </div>
             </td>
         </tr>
     `}).join('');
+}
+
+function toggleRowDetails(orderId) {
+    const row = document.getElementById(`details-${orderId}`);
+    if (row) {
+        row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+    }
 }
 
 // 訂單搜尋/篩選
@@ -356,11 +383,25 @@ function openOrderDetail(orderId) {
     document.getElementById('detailEmail').value = order.email || '';
     document.getElementById('detailLine').value = order.lineId || '';
 
-    const shipMethod = pending.shippingMethod || order.shippingMethod || '';
+    const shipMethod = pending.shippingMethod || order.shippingMethod || '7-11店到店'; // 預設必填
     const shipSelect = document.getElementById('detailShipping');
     shipSelect.value = shipMethod;
-    if (!shipSelect.value && shipMethod) {
-        console.warn('Unknown shipping method:', shipMethod);
+
+    if (!shipSelect.value) {
+        // 如果值不在選項內，可能是舊資料問題，強制選第一個或保留
+        // 這裡我們把 shipMethod 加回去或者選第一個
+        shipSelect.value = '7-11店到店';
+    }
+
+    // 載入運費
+    const shipFeeInput = document.getElementById('detailShippingFee');
+    if (pending.shippingFee !== undefined) {
+        shipFeeInput.value = pending.shippingFee;
+    } else if (order.shippingFee !== undefined) {
+        shipFeeInput.value = order.shippingFee;
+    } else {
+        // 如果沒有舊運費資料，根據運送方式預設
+        shipFeeInput.value = (shipMethod === '7-11店到店') ? 60 : 0;
     }
 
     document.getElementById('detailStoreName').value = pending.storeName || order.storeName || '';
@@ -388,6 +429,7 @@ function saveOrderDetailToBatch(orderId) {
         customerName: document.getElementById('detailName').value,
         customerPhone: document.getElementById('detailPhone').value,
         shippingMethod: document.getElementById('detailShipping').value,
+        shippingFee: parseInt(document.getElementById('detailShippingFee').value) || 0,
         storeName: document.getElementById('detailStoreName').value,
         storeAddress: document.getElementById('detailStoreAddress').value,
         note: document.getElementById('detailNote').value,
@@ -1033,6 +1075,10 @@ function updateShippingFee() {
     const shippingMethod = document.getElementById('detailShipping').value;
     const feeInput = document.getElementById('detailShippingFee');
 
+    // 如果是手動修改過的，也許我們不該覆蓋？
+    // 但如果使用者切換運送方式，通常期望運費跟著變。
+    // 所以策略是：切換運送方式時，總是更新為該方式的預設值。
+
     if (shippingMethod === '7-11店到店') {
         feeInput.value = 60;
     } else {
@@ -1207,65 +1253,8 @@ function handleProductSearchInput() {
 document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('productSearch');
     if (searchInput) {
-    } else if (typeof product.options === 'string' && product.options.trim() !== '') {
-        options = JSON.parse(product.options);
-    }
-} catch (e) {
-    console.error('規格解析失敗', e);
-    options = [];
-}
-
-// 如果是舊格式的 options (Array of strings or Objects?)
-// 假設 options 是一個 Array，每個元素可能有 name/values 或者直接是 string
-// 這裡簡化處理：如果 options 是 Array，且有內容
-
-if (options && options.length > 0) {
-    specSelect.innerHTML = '<option value="">請選擇規格</option>';
-
-    // 這裡假設 options 是簡單的字串陣列，或者是物件。
-    // 根據之前的程式碼，options 似乎是複雜結構？
-    // 讓我們看看之前的 productData.options 結構
-    // 在 saveProductBatchChanges 裡，options 是從 .option-group 收集來的
-    // 結構: [{ name: '顏色', values: ['紅', '藍'] }, ...]
-
-    // 我們需要把它展平成單一選單嗎？還是讓使用者選多個？
-    // 簡單起見，我們將所有組合展平，或者只顯示第一個選項群組
-    // 使用者之前的截圖顯示 "款式: 白色"，這表示可能是一個 select
-
-    // 嘗試展平選項組合 (如果是多層選項)
-    // 為了簡單，我們先只列出所有選項值，讓使用者選一項，或者手動輸入?
-    // 不，這裡應該要與商品詳情頁一致。
-
-    // 暫時實作：將所有選項值列出來
-    // 如果 options 是 [{name:'顏色', values:['紅','藍']}]
-    // 則顯示 "顏色: 紅", "顏色: 藍"
-
-    let hasSpecs = false;
-    options.forEach(opt => {
-        if (opt && opt.values && Array.isArray(opt.values)) {
-            opt.values.forEach(val => {
-                const optionText = `${opt.name}: ${val}`;
-                const option = document.createElement('option');
-                option.value = optionText;
-                option.textContent = optionText;
-                specSelect.appendChild(option);
-                hasSpecs = true;
-            });
-        }
-    });
-
-    if (hasSpecs) {
-        specGroup.style.display = 'block';
-    } else {
-        specGroup.style.display = 'none';
-    }
-} else {
-    specGroup.style.display = 'none';
-}
-            } else if (specGroup) {
-    specGroup.style.display = 'none';
-}
-        });
+        searchInput.addEventListener('input', handleProductSearchInput);
+        searchInput.addEventListener('change', handleProductSearchInput);
     }
 });
 
