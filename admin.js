@@ -531,6 +531,176 @@ function closeModal(id) {
     document.getElementById(id).style.display = 'none';
 }
 
+// ----------------------
+// 圖片上傳到 GitHub
+// ----------------------
+let selectedImages = [];
+
+function handleImageSelect(event) {
+    const files = Array.from(event.target.files);
+
+    // 檢查檔案
+    const validFiles = files.filter(file => {
+        const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        const maxSize = 5 * 1024 * 1024; // 5MB
+
+        if (!validTypes.includes(file.type)) {
+            alert(`${file.name} 格式不支援，請使用 JPG, PNG 或 WEBP`);
+            return false;
+        }
+
+        if (file.size > maxSize) {
+            alert(`${file.name} 檔案過大，請小於 5MB`);
+            return false;
+        }
+
+        return true;
+    });
+
+    if (validFiles.length === 0) return;
+
+    selectedImages = [...selectedImages, ...validFiles];
+    renderImagePreviews();
+    document.getElementById('uploadImagesBtn').style.display = 'block';
+}
+
+function renderImagePreviews() {
+    const container = document.getElementById('imagePreviewContainer');
+    container.innerHTML = '';
+
+    selectedImages.forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const div = document.createElement('div');
+            div.className = 'image-preview-item';
+            div.innerHTML = `
+                <img src="${e.target.result}" alt="預覽">
+                <button class="remove-btn" onclick="removeImage(${index})">×</button>
+            `;
+            container.appendChild(div);
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function removeImage(index) {
+    selectedImages.splice(index, 1);
+    renderImagePreviews();
+
+    if (selectedImages.length === 0) {
+        document.getElementById('uploadImagesBtn').style.display = 'none';
+    }
+}
+
+async function uploadImagesToGitHub() {
+    if (selectedImages.length === 0) {
+        alert('請先選擇圖片');
+        return;
+    }
+
+    const btn = document.getElementById('uploadImagesBtn');
+    const btnText = document.getElementById('uploadBtnText');
+    const originalText = btnText.textContent;
+
+    btn.disabled = true;
+    btnText.textContent = '上傳中... 0%';
+
+    const uploadedUrls = [];
+
+    try {
+        for (let i = 0; i < selectedImages.length; i++) {
+            const file = selectedImages[i];
+            btnText.textContent = `上傳中... ${Math.round((i / selectedImages.length) * 100)}%`;
+
+            // 轉換為 Base64
+            const base64 = await fileToBase64(file);
+            const base64Content = base64.split(',')[1]; // 移除 data:image/...;base64, 前綴
+
+            // 上傳到 GitHub
+            const result = await callApi('uploadImageToGitHub', {
+                fileName: file.name,
+                content: base64Content,
+                mimeType: file.type
+            });
+
+            if (result.success && result.data.url) {
+                uploadedUrls.push(result.data.url);
+            } else {
+                throw new Error(result.error || '上傳失敗');
+            }
+        }
+
+        // 成功：填入圖片 URL
+        const currentUrls = document.getElementById('prodImage').value;
+        const allUrls = currentUrls
+            ? currentUrls.split(',').concat(uploadedUrls).join(',')
+            : uploadedUrls.join(',');
+
+        document.getElementById('prodImage').value = allUrls;
+
+        // 清空選擇
+        selectedImages = [];
+        document.getElementById('imagePreviewContainer').innerHTML = '';
+        document.getElementById('imageFileInput').value = '';
+        btn.style.display = 'none';
+
+        alert(`成功上傳 ${uploadedUrls.length} 張圖片！`);
+
+    } catch (error) {
+        console.error('上傳失敗:', error);
+        alert('上傳失敗: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btnText.textContent = originalText;
+    }
+}
+
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+// 拖放支援
+document.addEventListener('DOMContentLoaded', () => {
+    // ... 原有的 DOMContentLoaded 邏輯 ...
+
+    // 加入拖放支援
+    const uploadZone = document.getElementById('uploadZone');
+    if (uploadZone) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, () => {
+                uploadZone.classList.add('drag-over');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, () => {
+                uploadZone.classList.remove('drag-over');
+            }, false);
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            document.getElementById('imageFileInput').files = files;
+            handleImageSelect({ target: { files: files } });
+        }, false);
+    }
+});
+
 // 手機版側邊欄切換
 function toggleSidebar() {
     const sidebar = document.querySelector('.sidebar');
