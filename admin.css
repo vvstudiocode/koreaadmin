@@ -776,6 +776,20 @@ color: var(--primary);
     color: var(--accent);
 }
 
+/* Order Detail Enhancements */
+.add-item-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.add-item-btn:hover {
+    background: #5a67d8;
+}
+
 /* ========================================
    MOBILE RESPONSIVE STYLES
    ======================================== */
