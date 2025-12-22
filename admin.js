@@ -411,11 +411,11 @@ function saveOrderDetailToBatch(orderId) {
 // ----------------------
 // 商品管理
 // ----------------------
-function fetchProducts() {
+function fetchProducts(force = false) {
     const tbody = document.getElementById('productsTableBody');
-    tbody.innerHTML = '<tr><td colspan="9" class="loading-cell">載入中...</td></tr>';
+    if (!force) tbody.innerHTML = '<tr><td colspan="9" class="loading-cell">載入中...</td></tr>';
 
-    callApi('getProductsAdmin')
+    callApi('getProductsAdmin', { _t: Date.now() })
         .then(data => {
             if (data.success) {
                 currentProducts = data.data.products;
@@ -730,10 +730,24 @@ function saveProductBatchChanges() {
     callApi('updateProductsBatch', { updates: updates })
         .then(data => {
             if (data.success) {
+                pendingProductUpdates.forEach(update => {
+                    // 略過新增的商品（因為沒有正式 ID），只處理現有商品的更新
+                    if (String(update.id).startsWith('NEW_')) return;
+
+                    const index = currentProducts.findIndex(p => String(p.id) === String(update.id));
+                    if (index !== -1) {
+                        // 將 pending 的變更合併到 currentProducts
+                        currentProducts[index] = { ...currentProducts[index], ...update };
+                    }
+                });
+
                 alert(`成功儲存 ${pendingProductUpdates.length} 筆商品的變更！`);
                 pendingProductUpdates = [];
                 updateProductBatchUI();
-                fetchProducts();
+                renderProducts(currentProducts); // 立即渲染更新後的資料
+
+                // 為了保險起見，稍微延遲後再 fetch，並加上隨機參數避免快取
+                setTimeout(() => fetchProducts(true), 100);
             } else {
                 alert('儲存失敗：' + data.error);
             }
