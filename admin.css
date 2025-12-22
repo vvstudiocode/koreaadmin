@@ -1179,3 +1179,28 @@ body.sidebar-open {
     padding-bottom: 1rem;
     border-bottom: 1px solid var(--border);
 }
+
+/* Toast 動畫 */
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
