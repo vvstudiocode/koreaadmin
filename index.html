@@ -51,12 +51,16 @@
                 </button>
                 <h2 id="pageTitle">總覽報表</h2>
                 <div class="header-actions">
+                    <a href="https://vvstudiocode.github.io/korea/" target="_blank" class="icon-btn"
+                        style="text-decoration:none; margin-right:10px; display:flex; align-items:center;">
+                        前往官網
+                    </a>
                     <div id="batchActions" style="display:none; margin-right: 1rem;">
                         <span id="unsavedChangesMsg"
                             style="color: #d9534f; font-size: 0.9rem; margin-right: 10px;"></span>
                         <button id="saveBatchBtn" onclick="saveBatchUpdates()" class="accent-btn">💾 儲存所有變更</button>
                     </div>
-                    <button onclick="refreshData()" class="refresh-btn">🔄 重新整理</button>
+                    <button onclick="refreshData()" class="refresh-btn">重新整理</button>
                 </div>
             </header>
 
@@ -236,7 +240,7 @@
                             <label>運送方式</label>
                             <select id="detailShipping" onchange="updateShippingFee()">
                                 <option value="7-11店到店">7-11店到店 (+60)</option>
-                                <option value="自取">自取 (免運)</option>
+                                <option value="限台中市面交">限台中市面交 (免運)</option>
                             </select>
                         </div>
                     </div>
