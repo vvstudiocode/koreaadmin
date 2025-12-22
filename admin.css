@@ -658,6 +658,124 @@ color: var(--primary);
     margin-top: 1rem;
 }
 
+/* Image Upload Styles */
+.image-upload-area {
+    margin-top: 0.5rem;
+}
+
+.upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: var(--bg-light);
+}
+
+.upload-zone:hover {
+    border-color: var(--accent);
+    background: #f0f4ff;
+}
+
+.upload-zone.drag-over {
+    border-color: var(--accent);
+    background: #e3f2ff;
+    transform: scale(1.02);
+}
+
+.upload-icon {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.6;
+}
+
+.upload-zone p {
+    margin: 0.5rem 0;
+    color: var(--text);
+    font-weight: 500;
+}
+
+.upload-zone small {
+    color: var(--text-secondary);
+}
+
+.image-preview-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.image-preview-item {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 2px solid var(--border);
+    aspect-ratio: 1;
+}
+
+.image-preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.image-preview-item .remove-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(255, 0, 0, 0.8);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-preview-item .remove-btn:hover {
+    background: rgba(255, 0, 0, 1);
+}
+
+.upload-btn {
+    width: 100%;
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.upload-btn:hover {
+    background: #5a67d8;
+    transform: translateY(-1px);
+}
+
+.upload-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.upload-progress {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: #e3f2ff;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    color: var(--accent);
+}
+
 /* ========================================
    MOBILE RESPONSIVE STYLES
    ======================================== */
