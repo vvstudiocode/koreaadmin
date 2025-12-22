@@ -284,12 +284,11 @@
                             <input type="text" id="prodName" required>
                         </div>
                         <div class="form-group half">
-                            <label>品牌名稱 (用於圖片分類)</label>
+                            <label>品牌名稱 (圖片分類)</label>
                             <input type="text" id="prodBrand" list="brandList" placeholder="選擇或輸入品牌">
                             <datalist id="brandList">
                                 <!-- 動態載入品牌列表 -->
                             </datalist>
-                            <small>💡 打字會自動提示已有品牌</small>
                         </div>
                     </div>
 
@@ -363,12 +362,11 @@
 
                             <button type="button" class="upload-btn" id="uploadImagesBtn"
                                 onclick="uploadImagesToGitHub()" style="display:none">
-                                <span id="uploadBtnText">📤 上傳圖片到 GitHub</span>
+                                <span id="uploadBtnText">上傳圖片到 GitHub</span>
                             </button>
                         </div>
 
                         <input type="hidden" id="prodImage">
-                        <small>圖片將自動上傳到 GitHub 並生成連結</small>
                     </div>
                     <div class="form-group">
                         <label>規格設定 (JSON 格式)</label>
