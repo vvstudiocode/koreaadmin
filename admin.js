@@ -476,48 +476,105 @@ function calculateInlineCost() {
     }
 }
 
-function handleProductSubmit(e) {
+async function handleProductSubmit(e) {
     e.preventDefault();
-    const productId = document.getElementById('prodId').value;
 
-    let options = {};
-    const optionsStr = document.getElementById('prodOptions').value.trim();
-    if (optionsStr) {
-        try {
-            options = JSON.parse(optionsStr);
-        } catch (e) {
-            alert('規格 JSON 格式錯誤'); return;
+    const submitBtn = document.querySelector('#productForm button[type="submit"]');
+    const originalBtnText = submitBtn.textContent;
+
+    try {
+        // 如果有待上傳的圖片，先上傳
+        if (selectedImages.length > 0) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = '上傳圖片中...';
+
+            const brand = document.getElementById('prodBrand').value.trim() || 'default';
+            const uploadedUrls = [];
+
+            for (let i = 0; i < selectedImages.length; i++) {
+                const file = selectedImages[i];
+                submitBtn.textContent = `上傳圖片 ${i + 1}/${selectedImages.length}...`;
+
+                const base64 = await fileToBase64(file);
+                const base64Content = base64.split(',')[1];
+
+                const result = await callApi('uploadImageToGitHub', {
+                    fileName: file.name,
+                    content: base64Content,
+                    mimeType: file.type,
+                    brand: brand
+                });
+
+                if (result.success && result.data.url) {
+                    uploadedUrls.push(result.data.url);
+                } else {
+                    throw new Error(result.error || '圖片上傳失敗');
+                }
+            }
+
+            // 將上傳的 URL 加入到圖片欄位
+            const currentUrls = document.getElementById('prodImage').value;
+            const allUrls = currentUrls
+                ? currentUrls.split(',').concat(uploadedUrls).join(',')
+                : uploadedUrls.join(',');
+            document.getElementById('prodImage').value = allUrls;
+
+            // 清空已選圖片
+            selectedImages = [];
+            document.getElementById('imagePreviewContainer').innerHTML = '';
+            document.getElementById('imageFileInput').value = '';
+            document.getElementById('uploadImagesBtn').style.display = 'none';
         }
+
+        submitBtn.textContent = '儲存中...';
+
+        const productId = document.getElementById('prodId').value;
+
+        let options = {};
+        const optionsStr = document.getElementById('prodOptions').value.trim();
+        if (optionsStr) {
+            try {
+                options = JSON.parse(optionsStr);
+            } catch (e) {
+                alert('規格 JSON 格式錯誤'); return;
+            }
+        }
+
+        // 建立 Product 物件
+        const isNew = !productId;
+        const tempId = isNew ? 'NEW_' + Date.now() : productId;
+
+        const productData = {
+            id: tempId,
+            name: document.getElementById('prodName').value,
+            category: document.getElementById('prodCategory').value,
+            brand: document.getElementById('prodBrand').value.trim() || '',
+            price: Number(document.getElementById('prodPrice').value),
+            cost: Number(document.getElementById('prodCost').value),
+            priceKrw: Number(document.getElementById('prodPriceKrw').value),
+            stock: Number(document.getElementById('prodStock').value),
+            status: document.getElementById('prodStatus').value,
+            description: document.getElementById('prodDesc').value,
+            image: document.getElementById('prodImage').value,
+            options: options
+        };
+
+        // 更新 Pending Queue
+        pendingProductUpdates = pendingProductUpdates.filter(p => String(p.id) !== String(tempId));
+        pendingProductUpdates.push(productData);
+
+        // 關閉 Modal 並更新 UI
+        closeModal('productModal');
+        updateProductBatchUI();
+        renderProducts(currentProducts);
+
+    } catch (error) {
+        console.error('儲存失敗:', error);
+        alert('儲存失敗: ' + error.message);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalBtnText;
     }
-
-    // 建立 Product 物件
-    const isNew = !productId;
-    const tempId = isNew ? 'NEW_' + Date.now() : productId;
-
-    const productData = {
-        id: tempId,
-        name: document.getElementById('prodName').value,
-        category: document.getElementById('prodCategory').value,
-        brand: document.getElementById('prodBrand').value.trim() || '',
-        price: Number(document.getElementById('prodPrice').value),
-        cost: Number(document.getElementById('prodCost').value),
-        priceKrw: Number(document.getElementById('prodPriceKrw').value),
-        stock: Number(document.getElementById('prodStock').value),
-        status: document.getElementById('prodStatus').value,
-        description: document.getElementById('prodDesc').value,
-        image: document.getElementById('prodImage').value,
-        options: options
-    };
-
-    // 更新 Pending Queue
-    // 移除舊的 update (如果有)
-    pendingProductUpdates = pendingProductUpdates.filter(p => String(p.id) !== String(tempId));
-    pendingProductUpdates.push(productData);
-
-    // 關閉 Modal 並更新 UI
-    closeModal('productModal');
-    updateProductBatchUI();
-    renderProducts(currentProducts);
 }
 
 function updateProductBatchUI() {
