@@ -234,7 +234,10 @@ function renderOrders(orders) {
             <td>${order.shippingMethod || '-'}</td>
             <td>${formatCurrency(order.total)}</td>
             <td onclick="event.stopPropagation()">
-                <button class="action-btn" onclick="openOrderDetail('${order.orderId}')">編輯</button>
+                <div style="display:flex; gap:5px;">
+                    <button class="action-btn" onclick="openOrderDetail('${order.orderId}')">編輯</button>
+                    <button class="action-btn btn-danger" onclick="confirmDeleteOrder('${order.orderId}')">刪除</button>
+                </div>
             </td>
         </tr>
         <tr id="details-${order.orderId}" style="display:none; background-color:#f8f9fa;">
@@ -576,7 +579,10 @@ function renderProducts(products) {
             <td>${p.stock}</td>
             <td>${p.status}</td>
             <td>
-                <button class="action-btn" onclick="openProductModal('${p.id || ''}')">編輯</button>
+                <div style="display:flex; gap:5px;">
+                    <button class="action-btn" onclick="openProductModal('${p.id || ''}')">編輯</button>
+                    <button class="action-btn btn-danger" onclick="confirmDeleteProduct('${p.id || ''}')">刪除</button>
+                </div>
             </td>
         </tr>
     `).join('');
@@ -1172,6 +1178,56 @@ function toggleSidebar() {
     sidebar.classList.toggle('active');
     document.querySelector('.sidebar-overlay').classList.toggle('active');
     document.body.classList.toggle('sidebar-open');
+}
+
+// ----------------------
+// 刪除操作
+// ----------------------
+async function confirmDeleteOrder(orderId) {
+    if (!confirm(`確定要刪除訂單 ${orderId} 嗎？此操作不可還原！`)) return;
+
+    try {
+        showToast(`正在刪除訂單 ${orderId}...`);
+        const result = await callApi('deleteOrder', { orderId: orderId });
+        if (result.success) {
+            showToast('訂單已刪除', 'success');
+            refreshData(); // 重新整理列表
+        } else {
+            alert('刪除失敗: ' + result.error);
+        }
+    } catch (e) {
+        console.error(e);
+        alert('刪除發生錯誤');
+    }
+}
+
+async function confirmDeleteProduct(productId) {
+    if (!productId || productId.startsWith('NEW_')) {
+        // 如果是尚未儲存的新商品，直接從暫存移除
+        if (confirm('確定要移除此待儲存商品嗎？')) {
+            pendingProductUpdates = pendingProductUpdates.filter(p => String(p.id) !== String(productId));
+            updateProductBatchUI();
+            renderProducts(currentProducts);
+            showToast('已移除待儲存商品', 'info');
+        }
+        return;
+    }
+
+    if (!confirm(`確定要刪除商品 ID: ${productId} 嗎？此操作不可還原！`)) return;
+
+    try {
+        showToast(`正在刪除商品 ${productId}...`);
+        const result = await callApi('deleteProduct', { productId: productId });
+        if (result.success) {
+            showToast('商品已刪除', 'success');
+            fetchProducts(true); // 重新整理列表
+        } else {
+            alert('刪除失敗: ' + result.error);
+        }
+    } catch (e) {
+        console.error(e);
+        alert('刪除發生錯誤');
+    }
 }
 
 // ----------------------
