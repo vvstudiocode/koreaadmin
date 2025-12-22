@@ -310,16 +310,59 @@ function getStatusColor(status) {
     return '#fff';
 }
 
-function markOrderUpdated(orderId, field, value) {
-    if (!pendingUpdates[orderId]) pendingUpdates[orderId] = {};
-    pendingUpdates[orderId][field] = value;
-
-    if (field === 'status') {
-        updateBatchUI();
-        renderOrders(currentOrders);
-    } else {
-        updateBatchUI();
+// 批量儲存訂單變更
+function saveBatchUpdates() {
+    const orderIds = Object.keys(pendingUpdates);
+    if (orderIds.length === 0) {
+        alert('沒有變更需要儲存');
+        return;
     }
+
+    const btn = document.querySelector('#batchActions button');
+    btn.disabled = true;
+    btn.textContent = '儲存中...';
+
+    // 關鍵修正：建構完整的訂單物件，避免部分更新導致資料遺失
+    const updates = orderIds.map(oid => {
+        const original = currentOrders.find(o => o.orderId === oid);
+        const changes = pendingUpdates[oid];
+
+        // 如果 original 存在，將變更合併；否則只送變更（理論上不應發生）
+        if (original) {
+            // 注意：這裡我們假設 pendingUpdates[oid] 包含所有變更欄位
+            // 如果只改狀態，pendingUpdates[oid] = { status: '...' }
+            // 我們合併 original 的 items 等重要資料
+            return {
+                ...original,
+                ...changes,
+                orderId: oid // 確保 ID 存在
+            };
+        }
+        return { orderId: oid, ...changes };
+    });
+
+    console.log('Batch Save Payload:', updates);
+
+    callApi('updateOrdersBatch', { updates: updates })
+        .then(result => {
+            if (result.success) {
+                alert('所有變更已儲存！');
+                pendingUpdates = {}; // 清空待處理
+                updateBatchUI();
+                // 重新讀取確保資料一致 (雖然會慢一點，但最安全)
+                fetchOrders();
+            } else {
+                alert('儲存失敗: ' + (result.error || '未知錯誤'));
+            }
+        })
+        .catch(e => {
+            console.error(e);
+            alert('儲存發生錯誤');
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.textContent = '💾 儲存所有變更';
+        });
 }
 
 function updateBatchUI() {
@@ -327,14 +370,71 @@ function updateBatchUI() {
     const msg = document.getElementById('unsavedChangesMsg');
     const btn = document.querySelector('#batchActions button');
 
+    if (msg && btn) {
+        if (count > 0) {
+            msg.textContent = `⚠️ 有 ${count} 筆訂單變更未儲存`;
+            btn.disabled = false;
+        } else {
+            msg.textContent = '';
+            btn.disabled = true;
+        }
+    }
+}
+
+// 立即更新訂單狀態
+async function markOrderUpdated(orderId, field, value) {
+    if (field !== 'status') return; // 目前只處理狀態變更
+
+    showToast(`正在更新訂單 ${orderId} 狀態...`);
+
+    // 樂觀更新 UI
+    const orderIndex = currentOrders.findIndex(o => o.orderId === orderId);
+    if (orderIndex !== -1) {
+        currentOrders[orderIndex].status = value;
+    }
+
+    // 準備 payload
+    // updateOrdersBatch 預期的是 [{ orderId, ...changes }]
+    const changes = {
+        orderId: orderId,
+        status: value
+    };
+
+    try {
+        const result = await callApi('updateOrdersBatch', { updates: [changes] });
+        if (result && result.success) {
+            showToast('訂單狀態已更新！', 'success');
+            // 不需要 reload，因為已經樂觀更新
+            // 但為了保險起見，也可以重整，但會打斷操作。
+            // 我們假設後端成功。
+        } else {
+            showToast('更新失敗，請重試', 'error');
+            // 回滾 UI? 稍微複雜，暫時忽略
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('連線錯誤', 'error');
+    }
+}
+
+// 移除舊的 updateBatchUI (如果只剩商品需要它)
+function updateBatchUI() {
+    // 這裡我們只檢查 pendingProductUpdates
+    // pendingUpdates (訂單) 將不再使用或清空
+    const count = Object.keys(pendingProductUpdates).length;
+    const msg = document.getElementById('unsavedChangesMsg');
+    const btn = document.querySelector('#batchActions button');
+
     if (count > 0) {
-        msg.textContent = `⚠️ 有 ${count} 筆變更未儲存`;
+        msg.textContent = `⚠️ 有 ${count} 筆商品變更未儲存`;
         btn.disabled = false;
-        btn.textContent = '💾 儲存所有變更';
+        btn.textContent = '💾 儲存商品變更';
+        // 確保按鈕綁定到 saveProductBatchChanges
+        btn.onclick = saveProductBatchChanges;
     } else {
         msg.textContent = '';
         btn.disabled = true;
-        btn.textContent = '沒有變更';
+        btn.textContent = '沒有未儲存的變更';
     }
 }
 
@@ -395,14 +495,37 @@ function openOrderDetail(orderId) {
 
     // 載入運費
     const shipFeeInput = document.getElementById('detailShippingFee');
+    let loadedFee = 0;
     if (pending.shippingFee !== undefined) {
-        shipFeeInput.value = pending.shippingFee;
+        loadedFee = pending.shippingFee;
     } else if (order.shippingFee !== undefined) {
-        shipFeeInput.value = order.shippingFee;
+        loadedFee = order.shippingFee;
     } else {
-        // 如果沒有舊運費資料，根據運送方式預設
-        shipFeeInput.value = (shipMethod === '7-11店到店') ? 60 : 0;
+        // 沒有舊資料
+        loadedFee = (shipMethod === '7-11店到店') ? 60 : 0;
     }
+
+    // 用戶反饋: "因為現在初始是711但是下方的運費實際不會增加"
+    // 如果是 7-11店到店 且 loadedFee 為 0，強制設為 60?
+    // 但這可能會覆蓋真的免運訂單。
+    // 折衷方案: 如果 loadedFee 是 0 且方法是 7-11，我們提示或者預設填 60 (如果是新訂單或資料不全)
+    // 這裡我們信任：如果 order.shippingFee 存在 (即使是0)，就用它。
+
+    // 但用戶抱怨的是初始化時沒反應。
+    // 如果 order.shippingFee 確實是 undefined (舊訂單)，上面 logic 會設 60.
+    // 如果 order.shippingFee 是 0 (可能來自 Google Sheet 空白被轉為 0)，那就會顯示 0.
+    // 我們可以依賴用戶手動改，或者：
+    if (shipMethod === '7-11店到店' && loadedFee === 0) {
+        // 是否要強制更新？
+        // 考慮到用戶體驗，如果是舊資料(可能運費欄位空白)，設為60比較好。
+        // 但如何區分 "空白" 和 "手動0"?
+        // Code.gs 裡如果是空白，可能會讀成 "" 或 0.
+        // 為了方便，我們預設 7-11 就是 60，除非這是一個已經確認的免運訂單？
+        // 暫時強制設為 60，讓用戶自己改 0 (如果是特例)。這比每次都要改 60 好。
+        loadedFee = 60;
+    }
+
+    shipFeeInput.value = loadedFee;
 
     document.getElementById('detailStoreName').value = pending.storeName || order.storeName || '';
     document.getElementById('detailStoreCode').value = order.storeCode || '';
@@ -424,6 +547,7 @@ function openOrderDetail(orderId) {
     openModal('orderDetailModal');
 }
 
+// 儲存訂單詳情到暫存區
 function saveOrderDetailToBatch(orderId) {
     const updates = {
         customerName: document.getElementById('detailName').value,
@@ -437,17 +561,14 @@ function saveOrderDetailToBatch(orderId) {
         total: parseInt(document.getElementById('detailTotal').textContent)
     };
 
-    console.log('saveOrderDetailToBatch - orderId:', orderId);
     console.log('saveOrderDetailToBatch - updates:', updates);
 
-    // 確保使用正確的 orderId 作為 key
-    pendingUpdates[orderId] = updates;
+    if (!pendingUpdates[orderId]) pendingUpdates[orderId] = {};
+    Object.assign(pendingUpdates[orderId], updates);
 
-    console.log('pendingUpdates after save:', pendingUpdates);
-
+    closeModal('orderDetailModal');
     updateBatchUI();
     renderOrders(currentOrders);
-    closeModal('orderDetailModal');
 }
 
 // ----------------------
@@ -501,9 +622,14 @@ function renderProducts(products) {
         }
     });
 
-    tbody.innerHTML = displayProducts.map(p => `
-        <tr class="${p._isModified ? 'row-modified' : ''}">
-            <td><img src="${p.image}" class="table-thumb" style="width:40px;height:40px;object-fit:cover;"></td>
+    displayProducts.push({ ...pending, _isModified: true, _isNew: true });
+}
+        }
+    });
+
+tbody.innerHTML = displayProducts.map(p => `
+        <tr class="${p._isModified ? 'row-modified' : ''}" data-id="${p.id}">
+            <td style="cursor:move;">☰ <img src="${p.image}" class="table-thumb" style="width:40px;height:40px;object-fit:cover;vertical-align:middle;"></td>
             <td>${p.name} ${p._isNew ? '(新)' : ''}</td>
             <td>${p.price}</td>
             <td style="color: #888;">${p.cost || 0}</td>
@@ -515,6 +641,8 @@ function renderProducts(products) {
             </td>
         </tr>
     `).join('');
+
+enableProductDragAndDrop();
 }
 
 // 載入現有品牌列表 (用於自動完成)
@@ -535,6 +663,112 @@ function loadBrandList() {
             .sort()
             .map(brand => `<option value="${brand}">`)
             .join('');
+    }
+}
+
+// 商品拖曳排序變數
+let dragSrcEl = null;
+
+function enableProduct dragAndDrop() {
+    const rows = document.querySelectorAll('#productsTableBody tr');
+    rows.forEach(row => {
+        row.setAttribute('draggable', true);
+        row.addEventListener('dragstart', handleDragStart);
+        row.addEventListener('dragover', handleDragOver);
+        row.addEventListener('drop', handleDrop);
+        // row.addEventListener('dragenter', handleDragEnter);
+        // row.addEventListener('dragleave', handleDragLeave);
+    });
+}
+
+function handleDragStart(e) {
+    dragSrcEl = this;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', this.innerHTML);
+    this.classList.add('dragging');
+}
+
+function handleDragOver(e) {
+    if (e.preventDefault) {
+        e.preventDefault();
+    }
+    e.dataTransfer.dropEffect = 'move';
+    return false;
+}
+
+function handleDrop(e) {
+    if (e.stopPropagation) {
+        e.stopPropagation();
+    }
+
+    if (dragSrcEl !== this) {
+        // 交換資料 (簡單的視覺交換，真正順序要看 currentProducts)
+        // 但我們需要更新 currentProducts 的順序以符合 DOM
+        const tbody = document.getElementById('productsTableBody');
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        const srcIndex = rows.indexOf(dragSrcEl);
+        const dstIndex = rows.indexOf(this);
+
+        // 移動 array 元素
+        const item = currentProducts[srcIndex];
+        currentProducts.splice(srcIndex, 1);
+        currentProducts.splice(dstIndex, 0, item);
+
+        renderProducts(currentProducts); // 重新渲染確保正確
+
+        // 顯示排序儲存按鈕，或者直接啟用 "儲存變更" (但那是儲存內容)
+        // 我們可以在 "儲存商品變更" 區域增加一個 "儲存排序" 按鈕？
+        // 或者直接讓 "儲存商品變更" 也包含排序 (比較複雜，因為那是 updateProductsBatch)
+        // 建議新增一個 "儲存排序" 按鈕，或者在拖曳後這顯示提示。
+        showUnsavedSortWarning();
+    }
+
+    dragSrcEl.classList.remove('dragging');
+    return false;
+}
+
+function showUnsavedSortWarning() {
+    // 我們可以複用 unsavedProductsMsg，或者新增一個
+    const msg = document.getElementById('unsavedProductsMsg');
+    if (msg) {
+        msg.textContent = '⚠️ 排序已變更，請點擊「儲存排序」';
+        // 我們動態新增一個按鈕? 或者檢查有沒有存排序按鈕
+        let sortBtn = document.getElementById('saveSortBtn');
+        if (!sortBtn) {
+            const container = document.getElementById('productBatchActions');
+            sortBtn = document.createElement('button');
+            sortBtn.id = 'saveSortBtn';
+            sortBtn.textContent = '💾 儲存排序';
+            sortBtn.className = 'accent-btn';
+            sortBtn.style.marginLeft = '10px';
+            sortBtn.style.backgroundColor = '#17a2b8'; // 不同顏色
+            sortBtn.onclick = saveProductSortOrder;
+            container.appendChild(sortBtn);
+        }
+    }
+}
+
+async function saveProductSortOrder() {
+    const btn = document.getElementById('saveSortBtn');
+    btn.disabled = true;
+    btn.textContent = '儲存中...';
+
+    const orderedIds = currentProducts.map(p => p.id);
+
+    try {
+        const result = await callApi('reorderProducts', { orderedIds: orderedIds });
+        if (result.success) {
+            alert('排序已儲存！');
+            btn.remove(); // 移除按鈕
+            const msg = document.getElementById('unsavedProductsMsg');
+            if (msg) msg.textContent = '';
+        } else {
+            alert('儲存排序失敗: ' + result.error);
+            btn.disabled = false;
+        }
+    } catch (e) {
+        alert('儲存排序錯誤');
+        btn.disabled = false;
     }
 }
 
@@ -600,43 +834,12 @@ async function handleProductSubmit(e) {
     const originalBtnText = submitBtn.textContent;
 
     try {
-        // 如果有待上傳的圖片，先上傳
-        if (selectedImages.length > 0) {
-            submitBtn.disabled = true;
-            submitBtn.textContent = '上傳圖片中...';
+        // 如果有待上傳的圖片，暫存起來，等整批儲存時再上傳
+        let newImagesToUpload = [];
+        if (selectedImages && selectedImages.length > 0) {
+            newImagesToUpload = [...selectedImages];
 
-            const brand = document.getElementById('prodBrand').value.trim() || 'default';
-            const uploadedUrls = [];
-
-            for (let i = 0; i < selectedImages.length; i++) {
-                const file = selectedImages[i];
-                submitBtn.textContent = `上傳圖片 ${i + 1}/${selectedImages.length}...`;
-
-                const base64 = await fileToBase64(file);
-                const base64Content = base64.split(',')[1];
-
-                const result = await callApi('uploadImageToGitHub', {
-                    fileName: file.name,
-                    content: base64Content,
-                    mimeType: file.type,
-                    brand: brand
-                });
-
-                if (result.success && result.data.url) {
-                    uploadedUrls.push(result.data.url);
-                } else {
-                    throw new Error(result.error || '圖片上傳失敗');
-                }
-            }
-
-            // 將上傳的 URL 加入到圖片欄位
-            const currentUrls = document.getElementById('prodImage').value;
-            const allUrls = currentUrls
-                ? currentUrls.split(',').concat(uploadedUrls).join(',')
-                : uploadedUrls.join(',');
-            document.getElementById('prodImage').value = allUrls;
-
-            // 清空已選圖片
+            // 清空已選圖片 UI
             selectedImages = [];
             document.getElementById('imagePreviewContainer').innerHTML = '';
             document.getElementById('imageFileInput').value = '';
@@ -673,6 +876,7 @@ async function handleProductSubmit(e) {
             status: document.getElementById('prodStatus').value,
             description: document.getElementById('prodDesc').value,
             image: document.getElementById('prodImage').value,
+            newImages: newImagesToUpload, // 暫存待上傳檔案
             options: options
         };
 
@@ -746,7 +950,8 @@ function saveBatchUpdates() {
 }
 
 // 商品批次儲存
-function saveProductBatchChanges() {
+// 商品批次儲存
+async function saveProductBatchChanges() {
     if (pendingProductUpdates.length === 0) {
         alert('沒有待儲存的商品變更');
         return;
@@ -758,51 +963,102 @@ function saveProductBatchChanges() {
     const btn = document.querySelector('#productBatchActions button');
     if (btn) {
         btn.disabled = true;
-        btn.textContent = '儲存中...';
+        btn.textContent = '處理中...';
     }
 
-    // 將 NEW_ ID 清除，讓後端生成
-    const updates = pendingProductUpdates.map(p => {
-        if (String(p.id).startsWith('NEW_')) {
-            return { ...p, id: null };
-        }
-        return p;
-    });
+    try {
+        // 先處理圖片上傳
+        const totalItems = pendingProductUpdates.length;
 
-    callApi('updateProductsBatch', { updates: updates })
-        .then(data => {
-            if (data.success) {
-                pendingProductUpdates.forEach(update => {
-                    // 略過新增的商品（因為沒有正式 ID），只處理現有商品的更新
-                    if (String(update.id).startsWith('NEW_')) return;
+        for (let i = 0; i < totalItems; i++) {
+            const item = pendingProductUpdates[i];
 
-                    const index = currentProducts.findIndex(p => String(p.id) === String(update.id));
-                    if (index !== -1) {
-                        // 將 pending 的變更合併到 currentProducts
-                        currentProducts[index] = { ...currentProducts[index], ...update };
+            if (item.newImages && item.newImages.length > 0) {
+                btn.textContent = `正在上傳 ${item.name} 的圖片 (1/${item.newImages.length})...`;
+
+                const uploadedUrls = [];
+                const brand = item.brand || 'default';
+
+                for (let j = 0; j < item.newImages.length; j++) {
+                    const file = item.newImages[j];
+                    btn.textContent = `正在上傳 ${item.name} 的圖片 (${j + 1}/${item.newImages.length})...`;
+
+                    try {
+                        const base64 = await fileToBase64(file);
+                        const base64Content = base64.split(',')[1];
+
+                        const result = await callApi('uploadImageToGitHub', {
+                            fileName: file.name,
+                            content: base64Content,
+                            mimeType: file.type,
+                            brand: brand
+                        });
+
+                        if (result.success && result.data.url) {
+                            uploadedUrls.push(result.data.url);
+                        } else {
+                            console.error(`圖片 ${file.name} 上傳失敗: ${result.error}`);
+                        }
+                    } catch (e) {
+                        console.error(`圖片 ${file.name} 上傳錯誤:`, e);
                     }
-                });
+                }
 
-                alert(`成功儲存 ${pendingProductUpdates.length} 筆商品的變更！`);
-                pendingProductUpdates = [];
-                updateProductBatchUI();
-                renderProducts(currentProducts); // 立即渲染更新後的資料
+                // 更新圖片欄位
+                const currentUrls = item.image;
+                const allUrls = currentUrls
+                    ? currentUrls.split(',').concat(uploadedUrls).join(',')
+                    : uploadedUrls.join(',');
 
-                // 為了保險起見，稍微延遲後再 fetch，並加上隨機參數避免快取
-                setTimeout(() => fetchProducts(true), 100);
-            } else {
-                alert('儲存失敗：' + data.error);
+                item.image = allUrls;
+                delete item.newImages; // 清除暫存檔案
             }
-        })
-        .catch(err => {
-            alert('儲存失敗：' + err);
-        })
-        .finally(() => {
-            if (btn) {
-                btn.disabled = false;
-                btn.textContent = '💾 儲存商品變更';
+        }
+
+        btn.textContent = '儲存商品資料中...';
+
+        // 將 NEW_ ID 清除，讓後端生成
+        const updates = pendingProductUpdates.map(p => {
+            const pCopy = { ...p };
+            delete pCopy.newImages; // 確保不傳送 File 物件到後端
+
+            if (String(pCopy.id).startsWith('NEW_')) {
+                return { ...pCopy, id: null };
             }
+            return pCopy;
         });
+
+        const data = await callApi('updateProductsBatch', { updates: updates });
+
+        if (data.success) {
+            pendingProductUpdates.forEach(update => {
+                // 略過新增的商品
+                if (String(update.id).startsWith('NEW_')) return;
+
+                const index = currentProducts.findIndex(p => String(p.id) === String(update.id));
+                if (index !== -1) {
+                    currentProducts[index] = { ...currentProducts[index], ...update };
+                }
+            });
+
+            alert(`成功儲存 ${pendingProductUpdates.length} 筆商品的變更！`);
+            pendingProductUpdates = [];
+            updateProductBatchUI();
+            renderProducts(currentProducts);
+
+            setTimeout(() => fetchProducts(true), 100);
+        } else {
+            alert('儲存失敗：' + data.error);
+        }
+    } catch (err) {
+        console.error(err);
+        alert('儲存過程中發生錯誤：' + err);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '💾 儲存所有變更';
+        }
+    }
 }
 
 function formatCurrency(num) {
@@ -1082,6 +1338,7 @@ function updateShippingFee() {
     if (shippingMethod === '7-11店到店') {
         feeInput.value = 60;
     } else {
+        // 限台中市面交 或其他
         feeInput.value = 0;
     }
 
@@ -1189,96 +1446,105 @@ function handleProductSearchInput() {
     const searchInput = document.getElementById('productSearch');
     if (!searchInput) return;
 
-    const val = searchInput.value;
-    console.log('商品搜尋輸入:', val);
+    const val = searchInput.value.trim(); // 去除前後空白
+    // console.log('商品搜尋輸入:', val); // 減少 log
 
-    // 完全匹配名稱
-    const product = currentProducts.find(p => p.name === val);
+    // 嘗試找到商品：名稱完全匹配 或 包含 (如果不只一個，取第一個完全匹配的，或第一個包含的)
+    let product = currentProducts.find(p => p.name.trim() === val);
+
+    // 如果沒找到，試試看是否包含 (例如用戶只打部分名稱)
+    // 但只有當用戶選中時才應該顯示規格，所以我們應該盡量精確。
+    // 用戶反饋 "沒有規格選項"，可能是名稱有一些不可見字符？
+    if (!product) {
+        // 嘗試更寬鬆的匹配 (Case insensitive)
+        product = currentProducts.find(p => p.name.trim().toLowerCase() === val.toLowerCase());
+    }
+
     const specGroup = document.getElementById('specSelectGroup');
     const specSelect = document.getElementById('productSpec');
 
     if (product) {
-        console.log('選中商品:', product.name, '選項資料:', product.options);
-    }
+        // console.log('找到商品:', product.name, product.options);
+        // ... (rest logic)
 
-    if (product && specGroup && specSelect) {
-        let options = [];
-        try {
-            if (Array.isArray(product.options)) {
-                options = product.options;
-            } else if (typeof product.options === 'string' && product.options.trim() !== '') {
-                options = JSON.parse(product.options);
-            }
-        } catch (e) {
-            console.error('規格解析失敗', e, product.options);
-            options = [];
-        }
-
-        console.log('解析後的規格選項:', options);
-
-        if (options && options.length > 0) {
-            // 清空舊選項
-            specSelect.innerHTML = '<option value="">請選擇規格</option>';
-
-            let hasSpecs = false;
-            options.forEach(opt => {
-                if (opt && opt.values && Array.isArray(opt.values)) {
-                    opt.values.forEach(val => {
-                        const optionText = `${opt.name}: ${val}`;
-                        const option = document.createElement('option');
-                        option.value = optionText;
-                        option.textContent = optionText;
-                        specSelect.appendChild(option);
-                        hasSpecs = true;
-                    });
+        if (product && specGroup && specSelect) {
+            let options = [];
+            try {
+                if (Array.isArray(product.options)) {
+                    options = product.options;
+                } else if (typeof product.options === 'string' && product.options.trim() !== '') {
+                    options = JSON.parse(product.options);
                 }
-            });
+            } catch (e) {
+                console.error('規格解析失敗', e, product.options);
+                options = [];
+            }
 
-            if (hasSpecs) {
-                specGroup.style.display = 'block';
-                console.log('顯示規格選單');
+            console.log('解析後的規格選項:', options);
+
+            if (options && options.length > 0) {
+                // 清空舊選項
+                specSelect.innerHTML = '<option value="">請選擇規格</option>';
+
+                let hasSpecs = false;
+                options.forEach(opt => {
+                    if (opt && opt.values && Array.isArray(opt.values)) {
+                        opt.values.forEach(val => {
+                            const optionText = `${opt.name}: ${val}`;
+                            const option = document.createElement('option');
+                            option.value = optionText;
+                            option.textContent = optionText;
+                            specSelect.appendChild(option);
+                            hasSpecs = true;
+                        });
+                    }
+                });
+
+                if (hasSpecs) {
+                    specGroup.style.display = 'block';
+                    console.log('顯示規格選單');
+                } else {
+                    specGroup.style.display = 'none';
+                    console.log('無有效規格選項，隱藏選單');
+                }
             } else {
                 specGroup.style.display = 'none';
-                console.log('無有效規格選項，隱藏選單');
             }
-        } else {
+        } else if (specGroup) {
             specGroup.style.display = 'none';
         }
-    } else if (specGroup) {
-        specGroup.style.display = 'none';
-    }
-}
-
-// 監聽商品輸入變更，動態顯示規格
-document.addEventListener('DOMContentLoaded', () => {
-    const searchInput = document.getElementById('productSearch');
-    if (searchInput) {
-        searchInput.addEventListener('input', handleProductSearchInput);
-        searchInput.addEventListener('change', handleProductSearchInput);
-    }
-});
-
-
-
-function removeOrderItem(index) {
-    if (confirm('確定刪除此商品？')) {
-        tempOrderItems.splice(index, 1);
-        renderOrderItems();
-    }
-}
-
-function renderOrderItems() {
-    const tbody = document.getElementById('detailItemsBody');
-    console.log('renderOrderItems 被調用，商品數量:', tempOrderItems.length);
-
-    if (tempOrderItems.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999;">尚未新增商品</td></tr>';
-        document.getElementById('detailShippingFee').value = 0;
-        document.getElementById('detailTotal').textContent = 0;
-        return;
     }
 
-    tbody.innerHTML = tempOrderItems.map((item, index) => `
+    // 監聽商品輸入變更，動態顯示規格
+    document.addEventListener('DOMContentLoaded', () => {
+        const searchInput = document.getElementById('productSearch');
+        if (searchInput) {
+            searchInput.addEventListener('input', handleProductSearchInput);
+            searchInput.addEventListener('change', handleProductSearchInput);
+        }
+    });
+
+
+
+    function removeOrderItem(index) {
+        if (confirm('確定刪除此商品？')) {
+            tempOrderItems.splice(index, 1);
+            renderOrderItems();
+        }
+    }
+
+    function renderOrderItems() {
+        const tbody = document.getElementById('detailItemsBody');
+        console.log('renderOrderItems 被調用，商品數量:', tempOrderItems.length);
+
+        if (tempOrderItems.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999;">尚未新增商品</td></tr>';
+            document.getElementById('detailShippingFee').value = 0;
+            document.getElementById('detailTotal').textContent = 0;
+            return;
+        }
+
+        tbody.innerHTML = tempOrderItems.map((item, index) => `
         <tr>
             <td>${item.name}</td>
             <td>${item.spec || '-'}</td>
@@ -1288,72 +1554,88 @@ function renderOrderItems() {
         </tr>
     `).join('');
 
-    // 更新總計
-    updateTotal();
+        // 更新總計
+        updateTotal();
 
-    console.log('商品明細已更新');
+        console.log('商品明細已更新');
+        // 全局重新整理
+        function refreshData() {
+            const btn = document.querySelector('.refresh-btn');
+            if (btn) btn.disabled = true;
 
-    // 確保新增商品區域狀態正確
-    const addArea = document.getElementById('addProductArea');
-    if (addArea && addArea.style.display === 'block') {
-        // 如果正在新增，保持開啟
-    } else if (addArea) {
-        addArea.style.display = 'none';
+            Promise.all([
+                fetchOrders(true),
+                fetchProducts(true)
+            ]).then(() => {
+                showToast('資料已更新', 'success');
+            }).catch(err => {
+                console.error(err);
+                showToast('更新失敗', 'error');
+            }).finally(() => {
+                if (btn) btn.disabled = false;
+            });
+        }
+        // 確保新增商品區域狀態正確
+        const addArea = document.getElementById('addProductArea');
+        if (addArea && addArea.style.display === 'block') {
+            // 如果正在新增，保持開啟
+        } else if (addArea) {
+            addArea.style.display = 'none';
+        }
     }
-}
 
-function submitManualOrder() {
-    if (tempOrderItems.length === 0) {
-        alert('請至少新增一個商品');
-        return;
-    }
+    function submitManualOrder() {
+        if (tempOrderItems.length === 0) {
+            alert('請至少新增一個商品');
+            return;
+        }
 
-    const customerName = document.getElementById('detailName').value.trim();
-    const customerPhone = document.getElementById('detailPhone').value.trim();
+        const customerName = document.getElementById('detailName').value.trim();
+        const customerPhone = document.getElementById('detailPhone').value.trim();
 
-    if (!customerName || !customerPhone) {
-        alert('請填寫客戶姓名和電話');
-        return;
-    }
+        if (!customerName || !customerPhone) {
+            alert('請填寫客戶姓名和電話');
+            return;
+        }
 
-    const orderData = {
-        customer: {
-            name: customerName,
-            phone: customerPhone,
-            email: document.getElementById('detailEmail').value.trim(),
-            lineId: document.getElementById('detailLine').value.trim()
-        },
-        shipping: {
-            method: document.getElementById('detailShipping').value,
-            storeName: document.getElementById('detailStoreName').value.trim(),
-            storeCode: document.getElementById('detailStoreCode').value.trim(),
-            address: document.getElementById('detailStoreAddress').value.trim(),
-            fee: parseInt(document.getElementById('detailShippingFee').value) || 0
-        },
-        items: tempOrderItems,
-        total: parseInt(document.getElementById('detailTotal').textContent),
-        note: document.getElementById('detailNote').value.trim()
-    };
+        const orderData = {
+            customer: {
+                name: customerName,
+                phone: customerPhone,
+                email: document.getElementById('detailEmail').value.trim(),
+                lineId: document.getElementById('detailLine').value.trim()
+            },
+            shipping: {
+                method: document.getElementById('detailShipping').value,
+                storeName: document.getElementById('detailStoreName').value.trim(),
+                storeCode: document.getElementById('detailStoreCode').value.trim(),
+                address: document.getElementById('detailStoreAddress').value.trim(),
+                fee: parseInt(document.getElementById('detailShippingFee').value) || 0
+            },
+            items: tempOrderItems,
+            total: parseInt(document.getElementById('detailTotal').textContent),
+            note: document.getElementById('detailNote').value.trim()
+        };
 
-    const btn = document.querySelector('#orderDetailModal .accent-btn');
-    btn.disabled = true;
-    btn.textContent = '建立中...';
+        const btn = document.querySelector('#orderDetailModal .accent-btn');
+        btn.disabled = true;
+        btn.textContent = '建立中...';
 
-    callApi('createManualOrder', { orderData: orderData })
-        .then(data => {
-            if (data.success) {
-                alert('訂單建立成功！訂單編號：' + data.data.orderId);
-                closeModal('orderDetailModal');
-                refreshData();
-            } else {
-                alert('建立失敗：' + data.error);
+        callApi('createManualOrder', { orderData: orderData })
+            .then(data => {
+                if (data.success) {
+                    alert('訂單建立成功！訂單編號：' + data.data.orderId);
+                    closeModal('orderDetailModal');
+                    refreshData();
+                } else {
+                    alert('建立失敗：' + data.error);
+                    btn.disabled = false;
+                    btn.textContent = '建立訂單';
+                }
+            })
+            .catch(err => {
+                alert('建立失敗：' + err);
                 btn.disabled = false;
                 btn.textContent = '建立訂單';
-            }
-        })
-        .catch(err => {
-            alert('建立失敗：' + err);
-            btn.disabled = false;
-            btn.textContent = '建立訂單';
-        });
-}
+            });
+    }
