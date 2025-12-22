@@ -114,8 +114,24 @@
 
             <!-- 2. 訂單管理視圖 -->
             <div id="ordersView" class="view-section" style="display: none;">
-                <div class="toolbar" style="margin-bottom: 1rem;">
+                <div class="toolbar" style="margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
                     <button class="add-btn" onclick="openCreateOrderModal()">+ 新增訂單</button>
+                    <!-- 訂單搜尋 -->
+                    <div style="flex: 1; min-width: 200px;">
+                        <input type="text" id="orderSearchInput" placeholder="🔍 搜尋訂單編號、客戶姓名、電話..."
+                            oninput="filterOrders()"
+                            style="width: 100%; padding: 0.6rem; border-radius: 6px; border: 1px solid #ddd;">
+                    </div>
+                    <!-- 狀態篩選 -->
+                    <select id="orderStatusFilter" onchange="filterOrders()"
+                        style="padding: 0.6rem; border-radius: 6px; border: 1px solid #ddd;">
+                        <option value="">全部狀態</option>
+                        <option value="待處理">待處理</option>
+                        <option value="已確認">已確認</option>
+                        <option value="已出貨">已出貨</option>
+                        <option value="已完成">已完成</option>
+                        <option value="已取消">已取消</option>
+                    </select>
                 </div>
                 <div class="table-container">
                     <table class="data-table">
@@ -143,6 +159,12 @@
             <div id="productsView" class="view-section" style="display: none;">
                 <div class="toolbar">
                     <button class="add-btn" onclick="openProductModal()">+ 新增商品</button>
+                    <!-- 商品搜尋 -->
+                    <div style="flex: 1; margin: 0 1rem;">
+                        <input type="text" id="productSearchInput" placeholder="🔍 搜尋商品名稱、分類、品牌..."
+                            oninput="filterProductsList()"
+                            style="width: 100%; padding: 0.6rem; border-radius: 6px; border: 1px solid #ddd;">
+                    </div>
                     <!-- 商品批次儲存區 -->
                     <div id="productBatchActions" style="display:inline-flex; align-items:center; margin-left: 1rem;">
                         <span id="unsavedProductsMsg"
@@ -423,6 +445,9 @@
             </form>
         </div>
     </div>
+
+    <!-- Toast 通知容器 -->
+    <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 10000;"></div>
 
     <script src="admin.js"></script>
 </body>
