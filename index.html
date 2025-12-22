@@ -114,6 +114,9 @@
 
             <!-- 2. 訂單管理視圖 -->
             <div id="ordersView" class="view-section" style="display: none;">
+                <div class="toolbar" style="margin-bottom: 1rem;">
+                    <button class="add-btn" onclick="openCreateOrderModal()">+ 新增訂單</button>
+                </div>
                 <div class="table-container">
                     <table class="data-table">
                         <thead>
@@ -234,7 +237,33 @@
                 </div>
 
                 <div class="detail-section">
-                    <h4>商品明細</h4>
+                    <h4>商品明細 <button type="button" class="add-item-btn" onclick="openAddProductToOrder()"
+                            style="float:right; padding:0.4rem 0.8rem; font-size:0.85rem;">+ 新增商品</button></h4>
+
+                    <!-- 新增商品區域（隱藏） -->
+                    <div id="addProductArea"
+                        style="display:none; margin-bottom:1rem; padding:1rem; background:#f8f9fa; border-radius:4px;">
+                        <div class="form-row">
+                            <div class="form-group" style="flex:2;">
+                                <label>選擇商品</label>
+                                <select id="productSearch" style="width:100%; padding:0.5rem;">
+                                    <option value="">-- 請選擇商品 --</option>
+                                    <!-- 動態載入 -->
+                                </select>
+                            </div>
+                            <div class="form-group quarter">
+                                <label>數量</label>
+                                <input type="number" id="productQty" value="1" min="1">
+                            </div>
+                            <div class="form-group" style="flex:0 0 auto; align-self:flex-end;">
+                                <button type="button" onclick="addProductToOrderItems()"
+                                    class="accent-btn">確認新增</button>
+                                <button type="button" onclick="cancelAddProduct()"
+                                    style="margin-left:0.5rem;">取消</button>
+                            </div>
+                        </div>
+                    </div>
+
                     <table class="detail-table">
                         <thead>
                             <tr>
@@ -242,6 +271,7 @@
                                 <th>規格</th>
                                 <th>數量</th>
                                 <th>小計</th>
+                                <th>操作</th>
                             </tr>
                         </thead>
                         <tbody id="detailItemsBody"></tbody>
