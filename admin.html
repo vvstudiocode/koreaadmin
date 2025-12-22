@@ -336,9 +336,27 @@
                     </div>
 
                     <div class="form-group">
-                        <label>圖片 URL</label>
-                        <input type="text" id="prodImage" placeholder="https://...">
-                        <small>多張圖片請用逗號分隔</small>
+                        <label>商品圖片</label>
+                        <div class="image-upload-area">
+                            <div class="upload-zone" id="uploadZone"
+                                onclick="document.getElementById('imageFileInput').click()">
+                                <div class="upload-icon">📷</div>
+                                <p>點擊選擇圖片或拖放到此處</p>
+                                <small>支援 JPG, PNG, WEBP (最大 5MB)</small>
+                            </div>
+                            <input type="file" id="imageFileInput" accept="image/jpeg,image/png,image/webp" multiple
+                                style="display:none" onchange="handleImageSelect(event)">
+
+                            <div class="image-preview-container" id="imagePreviewContainer"></div>
+
+                            <button type="button" class="upload-btn" id="uploadImagesBtn"
+                                onclick="uploadImagesToGitHub()" style="display:none">
+                                <span id="uploadBtnText">📤 上傳圖片到 GitHub</span>
+                            </button>
+                        </div>
+
+                        <input type="hidden" id="prodImage">
+                        <small>圖片將自動上傳到 GitHub 並生成連結</small>
                     </div>
                     <div class="form-group">
                         <label>規格設定 (JSON 格式)</label>
