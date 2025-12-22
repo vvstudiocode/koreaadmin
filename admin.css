@@ -265,6 +265,17 @@ body {
     background: var(--bg-light);
 }
 
+.btn-danger {
+    background-color: var(--danger) !important;
+    color: white !important;
+    border: none !important;
+}
+
+.btn-danger:hover {
+    background-color: #c82333 !important;
+    opacity: 0.9;
+}
+
 /* Modal */
 .modal {
     display: none;
