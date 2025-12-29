@@ -523,7 +523,7 @@ function saveOrderDetailToBatch(orderId) {
 // ----------------------
 function fetchProducts(force = false) {
     const tbody = document.getElementById('productsTableBody');
-    if (!force) tbody.innerHTML = '<tr><td colspan="9" class="loading-cell">載入中...</td></tr>';
+    if (!force) tbody.innerHTML = '<tr><td colspan="11" class="loading-cell">載入中...</td></tr>';
 
     callApi('getProductsAdmin', { _t: Date.now() })
         .then(data => {
@@ -569,12 +569,16 @@ function renderProducts(products) {
         }
     });
 
-    tbody.innerHTML = displayProducts.map(p => `
+    tbody.innerHTML = displayProducts.map(p => {
+        const profit = (p.price || 0) - (p.cost || 0);
+        return `
         <tr class="${p._isModified ? 'row-modified' : ''}" data-id="${p.id}">
-            <td style="cursor:move;">☰ <img src="${p.image}" class="table-thumb" style="width:40px;height:40px;object-fit:cover;vertical-align:middle;"></td>
+            <td style="cursor:move; text-align:center; color:#999;">☰</td>
+            <td><img src="${p.image}" class="table-thumb" style="width:40px;height:40px;object-fit:cover;vertical-align:middle;"></td>
             <td>${p.name} ${p._isNew ? '(新)' : ''}</td>
             <td>${p.price}</td>
             <td style="color: #888;">${p.cost || 0}</td>
+            <td style="color: #28a745; font-weight: 500;">${profit}</td>
             <td style="color: #aaa; font-size:0.9em;">₩${p.priceKrw || 0}</td>
             <td>${p.stock}</td>
             <td>${p.status}</td>
@@ -585,7 +589,7 @@ function renderProducts(products) {
                 </div>
             </td>
         </tr>
-    `).join('');
+    `}).join('');
 
     enableProductDragAndDrop();
 }
