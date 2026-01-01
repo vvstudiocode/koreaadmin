@@ -36,6 +36,8 @@
                 <li id="tab-dashboard" class="active" onclick="switchTab('dashboard')">總覽報表</li>
                 <li id="tab-orders" onclick="switchTab('orders')">訂單管理</li>
                 <li id="tab-products" onclick="switchTab('products')">商品管理</li>
+                <li id="tab-purchasing" onclick="switchTab('purchasing')">採買統計</li>
+                <li id="tab-settings" onclick="switchTab('settings')">網站設定</li>
             </ul>
             <div class="sidebar-footer">
                 <button onclick="logout()">登出</button>
@@ -201,7 +203,66 @@
                     </table>
                 </div>
             </div>
-        </main>
+
+            <!-- 採買統計視圖 -->
+            <div id="purchasingView" class="view-section" style="display: none;">
+                <div class="view-header">
+                    <h2>採買統計</h2>
+                    <div class="view-actions">
+                        <button class="btn-primary" onclick="loadPurchasingStats()">重新計算</button>
+                        <button class="btn-secondary" onclick="exportPurchasingStats()">匯出報表</button>
+                    </div>
+                </div>
+
+                <div class="filter-bar">
+                    <div class="filter-group">
+                        <label>日期範圍：</label>
+                        <input type="date" id="statsStartDate">
+                        <span>至</span>
+                        <input type="date" id="statsEndDate">
+                        <button class="btn-small" onclick="loadPurchasingStats()">篩選</button>
+                        <button class="btn-link" onclick="setStatsShortcut('today')">今日</button>
+                        <button class="btn-link" onclick="setStatsShortcut('yesterday')">昨日</button>
+                        <button class="btn-link" onclick="setStatsShortcut('7days')">近7日</button>
+                    </div>
+                </div>
+
+                <div class="stats-summary-cards">
+                    <div class="stats-card">
+                        <div class="stats-label">總計商品種數</div>
+                        <div class="stats-value" id="statsTotalTypes">0</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-label">總計商品件數</div>
+                        <div class="stats-value" id="statsTotalQty">0</div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>商品名稱</th>
+                                <th>規格/款式</th>
+                                <th>採買數量</th>
+                                <th>涉及訂單數</th>
+                            </tr>
+                        </thead>
+                        <tbody id="purchasingStatsBody">
+                            <tr>
+                                <td colspan="4" style="text-align:center">請選擇日期範圍後點擊篩選</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 4. 網站設定視圖 -->
+            <div id="settingsView" class="view-section" style="display: none;">
+            </div>
+    </div>
+    </div>
+    </main>
     </div>
 
     <!-- 訂單詳情 Modal (可編輯版) -->
