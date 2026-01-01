@@ -146,7 +146,30 @@ function switchTab(tabId) {
         if (currentProducts.length === 0) fetchProducts();
         else renderProducts(currentProducts);
 
+    } else if (tabId === 'products') {
+        document.getElementById('productsView').style.display = 'block';
+        document.getElementById('pageTitle').textContent = '商品管理';
+        if (currentProducts.length === 0) fetchProducts();
+        else renderProducts(currentProducts);
+
         updateProductBatchUI();
+    } else if (tabId === 'settings') {
+        document.getElementById('settingsView').style.display = 'block';
+        document.getElementById('pageTitle').textContent = '網站設定';
+        document.getElementById('batchActions').style.display = 'none'; // Ensure batch actions are hidden
+        loadSiteSettings();
+    } else if (tabId === 'purchasing') {
+        document.getElementById('purchasingView').style.display = 'block';
+        document.getElementById('pageTitle').textContent = '採買統計';
+        document.getElementById('batchActions').style.display = 'none';
+
+        // 初始化日期 (預設今天)
+        const today = new Date().toISOString().split('T')[0];
+        if (!document.getElementById('statsStartDate').value) {
+            document.getElementById('statsStartDate').value = today;
+            document.getElementById('statsEndDate').value = today;
+        }
+        loadPurchasingStats();
     }
 
     // 手機版：選完分頁後自動收起側邊欄
@@ -1616,4 +1639,248 @@ function submitManualOrder() {
             btn.disabled = false;
             btn.textContent = '建立訂單';
         });
+}
+
+// ----------------------
+// 網站設定
+// ----------------------
+let currentSettings = {};
+
+function loadSiteSettings() {
+    const container = document.getElementById('settingsForm');
+    container.innerHTML = '<div class="loading">載入設定中...</div>';
+
+    callApi('getSiteSettings')
+        .then(data => {
+            if (data.success) {
+                currentSettings = data.data.settings;
+                renderSettingsForm(currentSettings);
+            } else {
+                container.innerHTML = `<div class="error">載入失敗: ${data.error}</div>`;
+            }
+        })
+        .catch(err => {
+            container.innerHTML = `<div class="error">載入失敗: ${err}</div>`;
+        });
+}
+
+function renderSettingsForm(settings) {
+    const container = document.getElementById('settingsForm');
+
+    // Define known keys for better UI, others will be generic inputs
+    const knownKeys = {
+        'announcementTitle': '公告標題',
+        'announcementContent': '公告內容',
+        'heroImage': '首頁大圖 URL',
+        'footerInfo': '頁尾資訊 (HTML)' // Although user asked for "page management", this is a simple key-value store
+    };
+
+    let html = '<div class="settings-grid" style="display: grid; gap: 15px;">';
+
+    // Render known keys first
+    Object.keys(knownKeys).forEach(key => {
+        const val = settings[key] || '';
+        html += `
+            <div class="form-group">
+                <label style="font-weight:bold; display:block; margin-bottom:5px;">${knownKeys[key]} <small style="color:#888">(${key})</small></label>
+                <input type="text" class="setting-input" data-key="${key}" value="${val.replace(/"/g, '&quot;')}" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+            </div>
+        `;
+    });
+
+    // Render other keys
+    Object.keys(settings).forEach(key => {
+        if (!knownKeys[key] && key !== 'Key' && key !== 'Value') {
+            const val = settings[key];
+            html += `
+            <div class="form-group">
+                <label style="font-weight:bold; display:block; margin-bottom:5px;">${key}</label>
+                <input type="text" class="setting-input" data-key="${key}" value="${val}" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+            </div>
+            `;
+        }
+    });
+
+    html += '</div>';
+
+    // Add "Add New Setting" button? Maybe later.
+
+    container.innerHTML = html;
+}
+
+function saveSiteSettings() {
+    const inputs = document.querySelectorAll('.setting-input');
+    const newSettings = {};
+
+    inputs.forEach(input => {
+        newSettings[input.dataset.key] = input.value;
+    });
+
+    const btn = document.querySelector('#settingsView .accent-btn');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '儲存中...';
+
+    callApi('saveSiteSettings', { settings: newSettings })
+        .then(data => {
+            if (data.success) {
+                showToast('網站設定已儲存', 'success');
+                currentSettings = newSettings;
+            } else {
+                alert('儲存失敗: ' + data.error);
+            }
+        })
+        .catch(err => {
+            alert('儲存失敗: ' + err);
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        });
+}
+
+// ----------------------------------------------------
+// 採買統計
+// ----------------------------------------------------
+
+async function loadPurchasingStats() {
+    const startDate = document.getElementById('statsStartDate').value;
+    const endDate = document.getElementById('statsEndDate').value;
+
+    if (!startDate || !endDate) {
+        showToast('請選擇日期範圍', 'error');
+        return;
+    }
+
+    const tbody = document.getElementById('purchasingStatsBody');
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center">計算中...</td></tr>';
+
+    try {
+        const result = await callApi('getPurchasingStats', { startDate, endDate });
+        if (result.success) {
+            renderPurchasingStats(result.data.stats);
+        } else {
+            showToast('採買統計載入失敗: ' + result.error, 'error');
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:red">載入失敗</td></tr>';
+        }
+    } catch (e) {
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:red">連線錯誤</td></tr>';
+    }
+}
+
+function renderPurchasingStats(stats) {
+    const tbody = document.getElementById('purchasingStatsBody');
+    const totalTypesEl = document.getElementById('statsTotalTypes');
+    const totalQtyEl = document.getElementById('statsTotalQty');
+
+    if (!stats || stats.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center">此期間無訂單資料</td></tr>';
+        totalTypesEl.textContent = '0';
+        totalQtyEl.textContent = '0';
+        return;
+    }
+
+    let totalQty = 0;
+    let html = '';
+
+    stats.forEach((item, index) => {
+        totalQty += item.totalQty;
+        const detailRows = item.details.map(d => `
+            <div style="font-size: 0.85em; padding: 4px 0; border-bottom: 1px dashed #eee; display: flex; justify-content: space-between;">
+                <span>• <strong>${d.customerName}</strong> (${d.orderId})：${d.qty} 件</span>
+                <span style="color: #666;">[${d.status}] ${d.date}</span>
+            </div>
+        `).join('');
+
+        html += `
+            <tr onclick="togglePurchasingDetail(${index})" style="cursor: pointer;">
+                <td><strong>${item.name}</strong></td>
+                <td>${item.spec || '無規格'}</td>
+                <td style="color: #e91e63; font-weight: bold; font-size: 1.1em">${item.totalQty}</td>
+                <td>${item.orderCount} 筆 <span style="font-size: 0.8em; color: #999;">(點擊展開)</span></td>
+            </tr>
+            <tr id="purchasing-detail-${index}" style="display: none; background: #fffafb;">
+                <td colspan="4">
+                    <div style="padding: 10px 15px; border-left: 3px solid var(--accent);">
+                        <div style="font-weight: bold; margin-bottom: 5px; font-size: 0.9em;">訂單明細：</div>
+                        ${detailRows}
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+    totalTypesEl.textContent = stats.length;
+    totalQtyEl.textContent = totalQty;
+}
+
+function togglePurchasingDetail(index) {
+    const row = document.getElementById(`purchasing-detail-${index}`);
+    if (row) {
+        row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+    }
+}
+
+function setStatsShortcut(type) {
+    const startInput = document.getElementById('statsStartDate');
+    const endInput = document.getElementById('statsEndDate');
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+
+    if (type === 'today') {
+        startInput.value = today;
+        endInput.value = today;
+    } else if (type === 'yesterday') {
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        const yStr = yesterday.toISOString().split('T')[0];
+        startInput.value = yStr;
+        endInput.value = yStr;
+    } else if (type === '7days') {
+        const sevenDaysAgo = new Date(now);
+        sevenDaysAgo.setDate(now.getDate() - 6);
+        startInput.value = sevenDaysAgo.toISOString().split('T')[0];
+        endInput.value = today;
+    }
+
+    loadPurchasingStats();
+}
+
+function exportPurchasingStats() {
+    const startDate = document.getElementById('statsStartDate').value;
+    const endDate = document.getElementById('statsEndDate').value;
+    const tbody = document.getElementById('purchasingStatsBody');
+    const rows = tbody.querySelectorAll('tr');
+
+    if (rows.length === 0 || rows[0].innerText.includes('無訂單') || rows[0].innerText.includes('請選擇')) {
+        showToast('無資料可匯出', 'error');
+        return;
+    }
+
+    let csvContent = "\ufeff商品名稱,規格/款式,採買數量,涉及訂單數\n";
+
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length === 4) {
+            const name = cells[0].innerText.replace(/,/g, '');
+            const spec = cells[1].innerText.replace(/,/g, '');
+            const qty = cells[2].innerText;
+            const orders = cells[3].innerText;
+            csvContent += `${name},${spec},${qty},${orders}\n`;
+        }
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `採買清單_${startDate}_${endDate}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showToast('匯出成功');
 }
