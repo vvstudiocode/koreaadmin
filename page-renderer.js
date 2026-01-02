@@ -14,16 +14,33 @@ const PageRenderer = {
 
     fetchLayout: async function () {
         try {
-            const data = await callApi('getSiteSettings');
-            if (data.success && data.data.settings.homepage_layout) {
-                return JSON.parse(data.data.settings.homepage_layout);
+            // 嘗試從全域獲取 API URL
+            const apiUrl = typeof GAS_API_URL !== 'undefined' ? GAS_API_URL : '';
+            if (!apiUrl) throw new Error('GAS_API_URL is not defined');
+
+            // 如果在管理後台，直接使用現有的 callApi
+            if (typeof callApi === 'function') {
+                const result = await callApi('getSiteSettings');
+                if (result.success && result.data.settings.homepage_layout) {
+                    return JSON.parse(result.data.settings.homepage_layout);
+                }
+            } else {
+                // 如果在前台，直接透過 fetch 取得 (假設後台支援 action=getSiteSettings 的 GET 請求)
+                const response = await fetch(`${apiUrl}?action=getSiteSettings`);
+                const result = await response.json();
+                if (result.success && result.data.settings && result.data.settings.homepage_layout) {
+                    return JSON.parse(result.data.settings.homepage_layout);
+                }
             }
         } catch (err) {
-            console.error('Failed to fetch layout:', err);
+            console.error('❌ PageRenderer: Failed to fetch layout:', err);
         }
+
+        // 預設回退佈局
         return [
             { type: 'hero', title: 'Welcome to OMO Select', subtitle: 'Discover the best Korean products', image: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=1200&q=80' },
-            { type: 'categories' }
+            { type: 'categories' },
+            { type: 'product_list', title: '精選商品', category: '全部', limit: 4 }
         ];
     },
 
@@ -191,7 +208,7 @@ const PageRenderer = {
                 <img src="${imageUrl}" alt="${p.name}">
             </div>
             <div class="product-info">
-                <h3 class="product-title">${p.name}</h3>
+                <h3 class="product-name">${p.name}</h3>
                 <div class="product-price">NT$ ${p.price || 0}</div>
                 <button class="product-btn">${btnText}</button>
             </div>
