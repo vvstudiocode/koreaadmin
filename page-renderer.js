@@ -303,13 +303,12 @@ const PageRenderer = {
 
     createFallbackProductCard: function (p) {
         const card = document.createElement('div');
-        // 強制使用 block 佈局避免 flex 壓縮導致寬度歸零
         card.className = 'product-card system-card';
         card.style.cssText = 'display:block; width:100%; text-align:center; cursor:pointer; background:transparent;';
         card.setAttribute('data-id', p.id);
         card.onclick = () => { if (typeof showProductDetail === 'function') showProductDetail(p.id); };
 
-        // 圖片網址處理 (與彈窗邏輯同步)
+        // 圖片網址處理
         let imageUrl = 'https://via.placeholder.com/400?text=No+Image';
         const rawImg = p.image || p.prodImage || p.img || '';
         const imgStr = String(rawImg).trim();
@@ -319,24 +318,54 @@ const PageRenderer = {
 
         const hasOptions = p.options && (typeof p.options === 'string' ? p.options !== '{}' : Object.keys(p.options).length > 0);
         const btnText = hasOptions ? '選擇規格' : '加入購物車';
-        const btnAction = hasOptions ? `showProductDetail('${p.id}')` : `addToCartById('${p.id}')`;
 
-        // 構建物理寬度與高度明確的結構
-        card.innerHTML = `
-            <div class="card-img-box" style="width:100%; aspect-ratio:1/1; background:#f5f5f5; border-radius:12px; overflow:hidden; margin-bottom:15px; position:relative; min-height:250px;">
-                <img src="${imageUrl}" alt="${p.name}" loading="lazy" 
-                     style="width:100%; height:100%; object-fit:cover; display:block;"
-                     onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\"padding:80px 10px; color:#999;\">⚠️ 圖片載入失敗</div>';">
-            </div>
-            <div class="card-info-box" style="padding:0; width:100%;">
-                <h3 style="font-size:1.1rem; font-weight:500; margin-bottom:8px; height:2.8em; line-height:1.4; overflow:hidden; color:#333; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${p.name}</h3>
-                <div style="font-weight:700; font-size:1.1rem; margin-bottom:12px; color:#333;">NT$ ${p.price || 0}</div>
-                <button onclick="event.stopPropagation(); ${btnAction}" 
-                        style="width:100%; padding:12px; background:#D68C94; color:white; border:none; border-radius:30px; cursor:pointer; font-weight:500; transition: background 0.3s;">
-                    ${btnText}
-                </button>
-            </div>
-        `;
+        // 使用 DOM 建立元素避免 HTML 跳脫問題
+        const imgBox = document.createElement('div');
+        imgBox.className = 'card-img-box';
+        imgBox.style.cssText = 'width:100%; aspect-ratio:1/1; background:#f5f5f5; border-radius:12px; overflow:hidden; margin-bottom:15px; position:relative; min-height:250px;';
+
+        const img = document.createElement('img');
+        img.src = imageUrl;
+        img.alt = p.name || '';
+        img.loading = 'lazy';
+        img.style.cssText = 'width:100%; height:100%; object-fit:cover; display:block;';
+        img.onerror = function () {
+            this.style.display = 'none';
+            this.parentElement.innerHTML = '<div style="padding:80px 10px; color:#999;">⚠️ 圖片載入失敗</div>';
+        };
+        imgBox.appendChild(img);
+
+        const infoBox = document.createElement('div');
+        infoBox.className = 'card-info-box';
+        infoBox.style.cssText = 'padding:0; width:100%;';
+
+        const title = document.createElement('h3');
+        title.style.cssText = 'font-size:1.1rem; font-weight:500; margin-bottom:8px; height:2.8em; line-height:1.4; overflow:hidden; color:#333; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;';
+        title.textContent = p.name || '';
+
+        const price = document.createElement('div');
+        price.style.cssText = 'font-weight:700; font-size:1.1rem; margin-bottom:12px; color:#333;';
+        price.textContent = 'NT$ ' + (p.price || 0);
+
+        const btn = document.createElement('button');
+        btn.style.cssText = 'width:100%; padding:12px; background:#D68C94; color:white; border:none; border-radius:30px; cursor:pointer; font-weight:500; transition: background 0.3s;';
+        btn.textContent = btnText;
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            if (hasOptions) {
+                if (typeof showProductDetail === 'function') showProductDetail(p.id);
+            } else {
+                if (typeof addToCartById === 'function') addToCartById(p.id);
+            }
+        };
+
+        infoBox.appendChild(title);
+        infoBox.appendChild(price);
+        infoBox.appendChild(btn);
+
+        card.appendChild(imgBox);
+        card.appendChild(infoBox);
+
         return card;
     }
 };
