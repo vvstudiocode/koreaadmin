@@ -64,6 +64,25 @@ function showToast(message, type = 'info', duration = 3000) {
     }, duration);
 }
 
+function showLoadingOverlay() {
+    let loadingOverlay = document.getElementById('loadingOverlay');
+    if (!loadingOverlay) {
+        loadingOverlay = document.createElement('div');
+        loadingOverlay.id = 'loadingOverlay';
+        loadingOverlay.className = 'loading-overlay';
+        loadingOverlay.innerHTML = `<div class="spinner"></div>`;
+        document.body.appendChild(loadingOverlay);
+    }
+    loadingOverlay.classList.add('active');
+}
+
+function hideLoadingOverlay() {
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    if (loadingOverlay) {
+        loadingOverlay.classList.remove('active');
+    }
+}
+
 function handleLogin() {
     const passwordInput = document.getElementById('adminPassword');
     const password = passwordInput.value.trim();
@@ -145,14 +164,11 @@ function switchTab(tabId) {
         document.getElementById('pageTitle').textContent = '商品管理';
         if (currentProducts.length === 0) fetchProducts();
         else renderProducts(currentProducts);
-
-    } else if (tabId === 'products') {
-        document.getElementById('productsView').style.display = 'block';
-        document.getElementById('pageTitle').textContent = '商品管理';
-        if (currentProducts.length === 0) fetchProducts();
-        else renderProducts(currentProducts);
-
         updateProductBatchUI();
+    } else if (tabId === 'builder') {
+        document.getElementById('builderSection').style.display = 'block';
+        document.getElementById('pageTitle').textContent = '首頁排版管理';
+        if (typeof PageBuilder !== 'undefined') PageBuilder.init();
     } else if (tabId === 'settings') {
         document.getElementById('settingsView').style.display = 'block';
         document.getElementById('pageTitle').textContent = '網站設定';
@@ -1257,21 +1273,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// 手機版側邊欄切換
+// 側邊欄切換 (桌面收合 / 手機展開)
 function toggleSidebar() {
+    const isMobile = window.innerWidth <= 1024;
+    const dashboard = document.getElementById('dashboardPage');
     const sidebar = document.querySelector('.sidebar');
-    const overlay = document.querySelector('.sidebar-overlay');
 
-    if (!overlay) {
-        const newOverlay = document.createElement('div');
-        newOverlay.className = 'sidebar-overlay';
-        newOverlay.onclick = toggleSidebar;
-        document.body.appendChild(newOverlay);
+    if (isMobile) {
+        const overlay = document.querySelector('.sidebar-overlay');
+        if (!overlay) {
+            const newOverlay = document.createElement('div');
+            newOverlay.className = 'sidebar-overlay';
+            newOverlay.onclick = toggleSidebar;
+            document.body.appendChild(newOverlay);
+        }
+        sidebar.classList.toggle('active');
+        document.querySelector('.sidebar-overlay').classList.toggle('active');
+        document.body.classList.toggle('sidebar-open');
+    } else {
+        // 桌面版：收合
+        dashboard.classList.toggle('sidebar-collapsed');
+        // 加入動畫監聽，在動畫結束後通知 PageBuilder 更新比例
+        setTimeout(() => {
+            if (typeof PageBuilder !== 'undefined' && PageBuilder.updatePreviewScale) {
+                PageBuilder.updatePreviewScale();
+            }
+        }, 310); // 略長於 CSS transition 300ms
     }
-
-    sidebar.classList.toggle('active');
-    document.querySelector('.sidebar-overlay').classList.toggle('active');
-    document.body.classList.toggle('sidebar-open');
 }
 
 // ----------------------
