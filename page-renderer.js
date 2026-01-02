@@ -291,21 +291,34 @@ const PageRenderer = {
                 }
             }
 
-            let filtered = allProducts;
-            if (comp.category && comp.category !== '全部') {
-                filtered = allProducts.filter(p => p.category === comp.category);
+            let filtered = [];
+
+            // 根據來源類型篩選商品
+            if (comp.sourceType === 'manual' && comp.productIds && comp.productIds.length > 0) {
+                // 手動選擇：依照 ID 列表順序找出商品
+                comp.productIds.forEach(pid => {
+                    const found = allProducts.find(p => String(p.id) === String(pid));
+                    if (found) filtered.push(found);
+                });
+            } else {
+                // 分類篩選 (預設)
+                filtered = allProducts;
+                if (comp.category && comp.category !== '全部') {
+                    filtered = allProducts.filter(p => p.category === comp.category);
+                }
+                // 只有自動篩選才需要限制數量，手動選擇則顯示全部已選
+                const limit = parseInt(comp.limit) || 4;
+                filtered = filtered.slice(0, limit);
             }
 
-            const limit = parseInt(comp.limit) || 4;
-            const display = filtered.slice(0, limit);
-
             container.innerHTML = '';
-            if (display.length === 0) {
-                container.innerHTML = '<div class="empty-msg">此分類暫無商品</div>';
+            if (filtered.length === 0) {
+                const msg = comp.sourceType === 'manual' ? '尚未選擇展示商品' : '此分類暫無商品';
+                container.innerHTML = `<div class="empty-msg">${msg}</div>`;
                 return;
             }
 
-            display.forEach(p => {
+            filtered.forEach(p => {
                 // 確保 p.id 存在且 p.image 是字串
                 if (!p.id) p.id = 'PID-' + Math.random().toString(36).substr(2, 5);
                 const card = this.createFallbackProductCard(p);
