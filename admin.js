@@ -594,10 +594,13 @@ function renderProducts(products) {
 
     tbody.innerHTML = displayProducts.map(p => {
         const profit = (p.price || 0) - (p.cost || 0);
+        // 如果有多張圖片，只顯示第一張
+        const imageUrl = (p.image || "").split(',')[0].trim();
+
         return `
         <tr class="${p._isModified ? 'row-modified' : ''}" data-id="${p.id}">
             <td style="cursor:move; text-align:center; color:#999;">☰</td>
-            <td><img src="${p.image}" class="table-thumb" style="width:40px;height:40px;object-fit:cover;vertical-align:middle;"></td>
+            <td><img src="${imageUrl}" class="table-thumb" style="width:40px;height:40px;object-fit:cover;vertical-align:middle;"></td>
             <td>${p.name} ${p._isNew ? '(新)' : ''}</td>
             <td>${p.price}</td>
             <td style="color: #888;">${p.cost || 0}</td>
@@ -759,8 +762,7 @@ function openProductModal(productId = null) {
     let p = null;
 
     // 重置圖片狀態
-    selectedImages = [];
-    existingImages = [];
+    modalImages = [];
     document.getElementById('imagePreviewContainer').innerHTML = '';
     document.getElementById('uploadImagesBtn').style.display = 'none';
 
@@ -785,8 +787,9 @@ function openProductModal(productId = null) {
             // 處理現有圖片
             let imgVal = p.image || '';
             if (imgVal) {
-                existingImages = imgVal.split(',').filter(url => url.trim() !== '');
-                document.getElementById('prodImage').value = existingImages.join(',');
+                const urls = imgVal.split(',').filter(url => url.trim() !== '');
+                modalImages = urls.map(url => ({ type: 'existing', value: url }));
+                document.getElementById('prodImage').value = imgVal;
             } else {
                 document.getElementById('prodImage').value = '';
             }
@@ -824,17 +827,12 @@ async function handleProductSubmit(e) {
     const originalBtnText = submitBtn.textContent;
 
     try {
-        // 如果有待上傳的圖片，暫存起來，等整批儲存時再上傳
-        let newImagesToUpload = [];
-        if (selectedImages && selectedImages.length > 0) {
-            newImagesToUpload = [...selectedImages];
+        // 分離現有圖片和待上傳圖片
+        const existingImages = modalImages.filter(img => img.type === 'existing').map(img => img.value);
+        const newImagesToUpload = modalImages.filter(img => img.type === 'new').map(img => img.value);
 
-            // 清空已選圖片 UI
-            selectedImages = [];
-            document.getElementById('imagePreviewContainer').innerHTML = '';
-            document.getElementById('imageFileInput').value = '';
-            document.getElementById('uploadImagesBtn').style.display = 'none';
-        }
+        // 如果只有現有圖片且順序變了，我們直接更新 prodImage 以供之後儲存
+        document.getElementById('prodImage').value = existingImages.join(',');
 
         submitBtn.textContent = '儲存中...';
 
@@ -857,7 +855,8 @@ async function handleProductSubmit(e) {
             status: document.getElementById('prodStatus').value,
             description: document.getElementById('prodDesc').value,
             image: document.getElementById('prodImage').value,
-            newImages: newImagesToUpload, // 暫存待上傳檔案
+            modalImages: [...modalImages], // 保存完整順序資訊供上傳時參考
+            newImages: newImagesToUpload, // 暫存待上傳檔案 (相容舊邏輯)
             options: options
         };
 
@@ -920,44 +919,41 @@ async function saveProductBatchChanges() {
         for (let i = 0; i < totalItems; i++) {
             const item = pendingProductUpdates[i];
 
-            if (item.newImages && item.newImages.length > 0) {
-                btn.textContent = `正在上傳 ${item.name} 的圖片 (1/${item.newImages.length})...`;
+            if (item.modalImages && item.modalImages.some(img => img.type === 'new')) {
+                btn.textContent = `正在上傳 ${item.name} 的圖片...`;
 
-                const uploadedUrls = [];
                 const brand = item.brand || 'default';
 
-                for (let j = 0; j < item.newImages.length; j++) {
-                    const file = item.newImages[j];
-                    btn.textContent = `正在上傳 ${item.name} 的圖片 (${j + 1}/${item.newImages.length})...`;
-
-                    try {
-                        const base64 = await fileToBase64(file);
-                        const base64Content = base64.split(',')[1];
-
-                        const result = await callApi('uploadImageToGitHub', {
-                            fileName: file.name,
-                            content: base64Content,
-                            mimeType: file.type,
-                            brand: brand
-                        });
-
-                        if (result.success && result.data.url) {
-                            uploadedUrls.push(result.data.url);
-                        } else {
-                            console.error(`圖片 ${file.name} 上傳失敗: ${result.error}`);
-                        }
-                    } catch (e) {
-                        console.error(`圖片 ${file.name} 上傳錯誤:`, e);
+                // 逐一處理 modalImages
+                for (let j = 0; j < item.modalImages.length; j++) {
+                    const img = item.modalImages[j];
+                    if (img.type === 'new') {
+                        const file = img.value;
+                        try {
+                            const base64 = await fileToBase64(file);
+                            const base64Content = base64.split(',')[1];
+                            const result = await callApi('uploadImageToGitHub', {
+                                fileName: file.name,
+                                content: base64Content,
+                                mimeType: file.type,
+                                brand: brand
+                            });
+                            if (result.success && result.data.url) {
+                                img.type = 'existing';
+                                img.value = result.data.url;
+                            }
+                        } catch (e) { console.error(e); }
                     }
                 }
 
-                // 更新圖片欄位
-                let currentUrls = item.image || '';
-                let existingArr = currentUrls.split(',').map(u => u.trim()).filter(u => u !== '');
-                const allUrls = [...existingArr, ...uploadedUrls].join(',');
+                // 根據最終的 modalImages 組合 URL
+                item.image = item.modalImages
+                    .filter(img => img.type === 'existing')
+                    .map(img => img.value)
+                    .join(',');
 
-                item.image = allUrls;
-                delete item.newImages; // 清除暫存檔案
+                delete item.modalImages;
+                delete item.newImages;
             }
         }
 
@@ -1027,8 +1023,7 @@ function closeModal(id) {
 // ----------------------
 // 圖片上傳到 GitHub
 // ----------------------
-let selectedImages = [];
-let existingImages = []; // 新增：存儲現有圖片網址
+let modalImages = []; // 統一管理的圖片陣列 {type: 'existing'|'new', value: url|File, preview?: base64}
 
 function handleImageSelect(event) {
     const files = Array.from(event.target.files);
@@ -1053,55 +1048,101 @@ function handleImageSelect(event) {
 
     if (validFiles.length === 0) return;
 
-    selectedImages = [...selectedImages, ...validFiles];
+    validFiles.forEach(file => {
+        modalImages.push({ type: 'new', value: file });
+    });
+
     renderImagePreviews();
     document.getElementById('uploadImagesBtn').style.display = 'block';
 }
+
+let imageDragSrcIndex = null;
 
 function renderImagePreviews() {
     const container = document.getElementById('imagePreviewContainer');
     container.innerHTML = '';
 
-    // 1. 渲染現有圖片 (從 existingImages 陣列)
-    existingImages.forEach((url, index) => {
+    modalImages.forEach((img, index) => {
         const div = document.createElement('div');
-        div.className = 'image-preview-item existing';
-        div.innerHTML = `
-            <img src="${url}" alt="現有圖片">
-            <button type="button" class="remove-btn" onclick="removeExistingImage(${index})">×</button>
-        `;
+        div.className = `image-preview-item ${img.type}`;
+        div.setAttribute('draggable', true);
+        div.dataset.index = index;
+
+        // 事件監聽
+        div.addEventListener('dragstart', handleImageDragStart);
+        div.addEventListener('dragover', handleImageDragOver);
+        div.addEventListener('drop', handleImageDragDrop);
+
+        const imgEl = document.createElement('img');
+        if (img.type === 'existing') {
+            imgEl.src = img.value;
+        } else {
+            // 對於新檔案，如果還沒產生預覽圖就產生
+            if (!img.preview) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    img.preview = e.target.result;
+                    imgEl.src = img.preview;
+                };
+                reader.readAsDataURL(img.value);
+            } else {
+                imgEl.src = img.preview;
+            }
+        }
+
+        div.appendChild(imgEl);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'remove-btn';
+        removeBtn.innerHTML = '×';
+        removeBtn.onclick = (e) => {
+            e.stopPropagation();
+            removeModalImage(index);
+        };
+        div.appendChild(removeBtn);
+
         container.appendChild(div);
     });
-
-    // 2. 渲染新選擇的檔案 (從 selectedImages 陣列)
-    selectedImages.forEach((file, index) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const div = document.createElement('div');
-            div.className = 'image-preview-item new';
-            div.innerHTML = `
-                <img src="${e.target.result}" alt="預覽">
-                <button type="button" class="remove-btn" onclick="removeNewImage(${index})">×</button>
-            `;
-            container.appendChild(div);
-        };
-        reader.readAsDataURL(file);
-    });
 }
 
-// 移除現有圖片
-function removeExistingImage(index) {
-    existingImages.splice(index, 1);
-    document.getElementById('prodImage').value = existingImages.join(',');
-    renderImagePreviews();
+function handleImageDragStart(e) {
+    imageDragSrcIndex = parseInt(this.dataset.index);
+    e.dataTransfer.effectAllowed = 'move';
+    this.classList.add('dragging');
 }
 
-// 移除新選圖片
-function removeNewImage(index) {
-    selectedImages.splice(index, 1);
+function handleImageDragOver(e) {
+    if (e.preventDefault) e.preventDefault();
+    return false;
+}
+
+function handleImageDragDrop(e) {
+    if (e.stopPropagation) e.stopPropagation();
+
+    const targetIndex = parseInt(this.dataset.index);
+    if (imageDragSrcIndex !== targetIndex) {
+        const item = modalImages[imageDragSrcIndex];
+        modalImages.splice(imageDragSrcIndex, 1);
+        modalImages.splice(targetIndex, 0, item);
+        renderImagePreviews();
+
+        // 更新隱藏的 prodImage (僅限現有的)
+        const existing = modalImages.filter(i => i.type === 'existing').map(i => i.value);
+        document.getElementById('prodImage').value = existing.join(',');
+    }
+    return false;
+}
+
+function removeModalImage(index) {
+    modalImages.splice(index, 1);
     renderImagePreviews();
 
-    if (selectedImages.length === 0) {
+    // 更新現有的
+    const existing = modalImages.filter(i => i.type === 'existing').map(i => i.value);
+    document.getElementById('prodImage').value = existing.join(',');
+
+    if (!modalImages.some(img => img.type === 'new')) {
         document.getElementById('uploadImagesBtn').style.display = 'none';
     }
 }
@@ -1125,40 +1166,41 @@ async function uploadImagesToGitHub() {
     const uploadedUrls = [];
 
     try {
-        for (let i = 0; i < selectedImages.length; i++) {
-            const file = selectedImages[i];
-            btnText.textContent = `上傳中... ${Math.round((i / selectedImages.length) * 100)}%`;
+        for (let i = 0; i < modalImages.length; i++) {
+            const img = modalImages[i];
+            if (img.type === 'new') {
+                const file = img.value;
+                btnText.textContent = `上傳中... ${Math.round((i / modalImages.length) * 100)}%`;
 
-            // 轉換為 Base64
-            const base64 = await fileToBase64(file);
-            const base64Content = base64.split(',')[1]; // 移除 data:image/...;base64, 前綴
+                // 轉換為 Base64
+                const base64 = await fileToBase64(file);
+                const base64Content = base64.split(',')[1];
 
-            // 上傳到 GitHub (傳遞品牌)
-            const result = await callApi('uploadImageToGitHub', {
-                fileName: file.name,
-                content: base64Content,
-                mimeType: file.type,
-                brand: brand
-            });
+                const result = await callApi('uploadImageToGitHub', {
+                    fileName: file.name,
+                    content: base64Content,
+                    mimeType: file.type,
+                    brand: brand
+                });
 
-            if (result.success && result.data.url) {
-                uploadedUrls.push(result.data.url);
-            } else {
-                throw new Error(result.error || '上傳失敗');
+                if (result.success && result.data.url) {
+                    img.type = 'existing';
+                    img.value = result.data.url;
+                } else {
+                    throw new Error(result.error || '上傳失敗');
+                }
             }
         }
 
         // 成功：合併 URL
-        existingImages = [...existingImages, ...uploadedUrls];
-        document.getElementById('prodImage').value = existingImages.join(',');
+        const allUrls = modalImages.filter(i => i.type === 'existing').map(i => i.value).join(',');
+        document.getElementById('prodImage').value = allUrls;
 
         // 清空新選擇
-        selectedImages = [];
-        document.getElementById('imagePreviewContainer').innerHTML = '';
-        document.getElementById('imageFileInput').value = '';
         btn.style.display = 'none';
 
-        alert(`成功上傳 ${uploadedUrls.length} 張圖片到 ${brand} 資料夾！`);
+        alert(`圖片上傳並排序完成！`);
+        renderImagePreviews();
 
     } catch (error) {
         console.error('上傳失敗:', error);
