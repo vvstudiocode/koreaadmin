@@ -552,9 +552,51 @@ const PageBuilder = {
         if (typeof PageRenderer !== 'undefined') {
             PageRenderer.render(container, this.layout);
 
+            // 渲染頁尾預覽區塊
+            if (this.footer) {
+                this.renderFooterPreview(container);
+            }
+
             // 讓預覽渲染完後也跑一次縮放
             setTimeout(() => this.updatePreviewScale(), 100);
         }
+    },
+
+    // 在預覽區顯示頁尾
+    renderFooterPreview: function (container) {
+        // 移除舊的頁尾預覽
+        const existingFooter = container.querySelector('.preview-footer');
+        if (existingFooter) existingFooter.remove();
+
+        const footerSection = document.createElement('div');
+        footerSection.className = 'preview-footer';
+        footerSection.style.cssText = 'background:#f8f4f0; padding:30px 20px; margin-top:30px; border-top:1px solid #eee;';
+
+        // 渲染購買須知
+        let noticesHTML = '';
+        if (this.footer.notices && this.footer.notices.length > 0) {
+            noticesHTML = '<ul style="list-style:none; padding:0; margin:0 0 20px 0; font-size:13px; color:#555;">' +
+                this.footer.notices.map(n => `<li style="margin-bottom:8px;"><strong>${n.title}</strong><br>${(n.content || '').replace(/\n/g, '<br>')}</li>`).join('') +
+                '</ul>';
+        }
+
+        // 渲染社群連結
+        let socialHTML = '';
+        if (this.footer.socialLinks) {
+            const links = this.footer.socialLinks;
+            socialHTML = '<div style="display:flex; justify-content:center; gap:15px; margin-bottom:10px;">' +
+                (links.line ? '<span style="font-size:20px;">📱</span>' : '') +
+                (links.instagram ? '<span style="font-size:20px;">📸</span>' : '') +
+                (links.threads ? '<span style="font-size:20px;">🧵</span>' : '') +
+                '</div>';
+        }
+
+        // 渲染版權
+        const copyrightHTML = this.footer.copyright ?
+            `<div style="text-align:center; font-size:12px; color:#999;">${this.footer.copyright}</div>` : '';
+
+        footerSection.innerHTML = noticesHTML + socialHTML + copyrightHTML;
+        container.appendChild(footerSection);
     },
 
     updatePreviewScale: function () {
