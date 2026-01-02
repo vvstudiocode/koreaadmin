@@ -30,36 +30,44 @@ const PageRenderer = {
     },
 
     fetchLayout: async function () {
-        try {
-            // 嘗試從全域獲取 API URL
-            const apiUrl = typeof GAS_API_URL !== 'undefined' ? GAS_API_URL : '';
-            if (!apiUrl) throw new Error('GAS_API_URL is not defined');
+        // 【正式環境建議直接修改此處】直接在代碼中定義排版，速度最快且最穩定
+        const HARDCODED_LAYOUT = [
+            {
+                type: 'hero',
+                title: 'Welcome to OMO Select',
+                subtitle: 'Discover the best Korean products',
+                image: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=1200'
+            },
+            { type: 'categories' },
+            {
+                type: 'products',
+                title: '精選推薦',
+                category: '全部',
+                limit: 8
+            },
+            {
+                type: 'product_list',
+                title: '最新商品',
+                category: '全部',
+                limit: 20
+            }
+        ];
 
-            // 如果在管理後台，直接使用現有的 callApi
-            if (typeof callApi === 'function') {
-                const result = await callApi('getSiteSettings');
-                if (result.success && result.data.settings.homepage_layout) {
-                    return JSON.parse(result.data.settings.homepage_layout);
-                }
-            } else {
-                // 如果在前台，直接透過 fetch 取得 (假設後台支援 action=getSiteSettings 的 GET 請求)
-                const response = await fetch(`${apiUrl}?action=getSiteSettings`);
-                const result = await response.json();
-                if (result.success && result.data.settings && result.data.settings.homepage_layout) {
-                    return JSON.parse(result.data.settings.homepage_layout);
-                }
+        try {
+            const apiUrl = typeof GAS_API_URL !== 'undefined' ? GAS_API_URL : '';
+            if (!apiUrl) return HARDCODED_LAYOUT;
+
+            // 嘗試從後端抓取更新 (異步，不阻塞預設顯示)
+            const response = await fetch(`${apiUrl}?action=getSiteSettings`);
+            const result = await response.json();
+            if (result.success && result.data.settings && result.data.settings.homepage_layout) {
+                return JSON.parse(result.data.settings.homepage_layout);
             }
         } catch (err) {
-            console.error('❌ PageRenderer: Failed to fetch layout:', err);
+            console.warn('⚠️ Fetching remote layout failed, using hardcoded local version.');
         }
 
-        // 預設回退佈局 (在此直接更改即可同步至官網)
-        return [
-            { type: 'hero', title: 'Welcome to OMO Select', subtitle: 'Discover the best Korean products', image: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=1200&q=80' },
-            { type: 'categories' },
-            { type: 'products', title: '精選推薦', category: '全部', limit: 8 },
-            { type: 'product_list', title: '最新商品', category: '全部', limit: 20 }
-        ];
+        return HARDCODED_LAYOUT;
     },
 
     render: async function (container, layout) {
@@ -223,52 +231,38 @@ const PageRenderer = {
 
     createFallbackProductCard: function (p) {
         const card = document.createElement('div');
-        card.className = 'product-card';
+        // 強制使用 block 佈局避免 flex 壓縮導致寬度歸零
+        card.className = 'product-card system-card';
+        card.style.cssText = 'display:block; width:100%; text-align:center; cursor:pointer; background:transparent;';
         card.setAttribute('data-id', p.id);
-        // 點擊卡片開啟詳情
         card.onclick = () => { if (typeof showProductDetail === 'function') showProductDetail(p.id); };
 
-        // 處理多圖與缺圖 (確保 image 是字串)
+        // 圖片網址處理 (與彈窗邏輯同步)
         let imageUrl = 'https://via.placeholder.com/400?text=No+Image';
         const rawImg = p.image || p.prodImage || p.img || '';
         const imgStr = String(rawImg).trim();
-
         if (imgStr && imgStr !== '' && imgStr !== 'undefined' && imgStr !== 'null') {
-            const firstImg = imgStr.split(',')[0].trim();
-            if (firstImg) {
-                imageUrl = firstImg;
-            }
-        }
-
-        // 偵錯日誌
-        if (typeof PageRenderer._debugCount === 'undefined') PageRenderer._debugCount = 0;
-        PageRenderer._debugCount++;
-        if (PageRenderer._debugCount <= 5) {
-            console.log(`[PageRenderer Debug ${PageRenderer._debugCount}] 商品: ${p.name}, 網址: ${imageUrl}`);
+            imageUrl = imgStr.split(',')[0].trim();
         }
 
         const hasOptions = p.options && (typeof p.options === 'string' ? p.options !== '{}' : Object.keys(p.options).length > 0);
         const btnText = hasOptions ? '選擇規格' : '加入購物車';
+        const btnAction = hasOptions ? `showProductDetail('${p.id}')` : `addToCartById('${p.id}')`;
 
-        // 按鈕點擊事件
-        const btnAction = hasOptions
-            ? `showProductDetail('${p.id}')`
-            : `addToCartById('${p.id}')`;
-
-        // 使用 padding-top 的方式強制撐出高度，防止 aspect-ratio 不相容
+        // 構建物理寬度與高度明確的結構
         card.innerHTML = `
-            <div class="product-image" style="width:100%; position:relative; background:#f0f0f0; border-radius:12px; overflow:hidden; margin-bottom:15px; height:0; padding-top:100%;">
-                <div style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:10px; color:#ccc;">
-                    <img src="${imageUrl}" alt="${p.name}" loading="lazy" 
-                         style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:2;"
-                         onerror="this.style.display='none'; this.parentElement.querySelector('span').innerHTML='⚠️ 無法載入';">
-                    <span style="z-index:1;">載入中...</span>
-                </div>
+            <div class="card-img-box" style="width:100%; aspect-ratio:1/1; background:#f5f5f5; border-radius:12px; overflow:hidden; margin-bottom:15px; position:relative; min-height:250px;">
+                <img src="${imageUrl}" alt="${p.name}" loading="lazy" 
+                     style="width:100%; height:100%; object-fit:cover; display:block;"
+                     onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\"padding:80px 10px; color:#999;\">⚠️ 圖片載入失敗</div>';">
             </div>
-            <div class="product-info">
-                <h3 class="product-name" style="font-size:1.1rem; font-weight:500; margin-bottom:8px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; height:2.8em; line-height:1.4; text-align:center;">${p.name}</h3>
-                <div class="product-price" style="font-weight:600; font-size:1.1rem; margin-bottom:12px; text-align:center;">NT$ ${p.price || 0}</div>
-                <button class="product-btn" onclick="event.stopPropagation(); ${btnAction}" style="width:100%; padding:10px; background:#D68C94; color:white; border:none; border-radius:30px; cursor:pointer;">${btnText}</button>
+            <div class="card-info-box" style="padding:0; width:100%;">
+                <h3 style="font-size:1.1rem; font-weight:500; margin-bottom:8px; height:2.8em; line-height:1.4; overflow:hidden; color:#333; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${p.name}</h3>
+                <div style="font-weight:700; font-size:1.1rem; margin-bottom:12px; color:#333;">NT$ ${p.price || 0}</div>
+                <button onclick="event.stopPropagation(); ${btnAction}" 
+                        style="width:100%; padding:12px; background:#D68C94; color:white; border:none; border-radius:30px; cursor:pointer; font-weight:500; transition: background 0.3s;">
+                    ${btnText}
+                </button>
             </div>
         `;
         return card;
