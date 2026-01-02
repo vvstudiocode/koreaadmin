@@ -53,19 +53,20 @@ const PageRenderer = {
             console.error('❌ PageRenderer: Failed to fetch layout:', err);
         }
 
-        // 預設回退佈局
+        // 預設回退佈局 (在此直接更改即可同步至官網)
         return [
             { type: 'hero', title: 'Welcome to OMO Select', subtitle: 'Discover the best Korean products', image: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=1200&q=80' },
             { type: 'categories' },
-            { type: 'product_list', title: '精選商品', category: '全部', limit: 4 }
+            { type: 'products', title: '精選推薦', category: '全部', limit: 8 },
+            { type: 'product_list', title: '最新商品', category: '全部', limit: 20 }
         ];
     },
 
-    render: function (container, layout) {
+    render: async function (container, layout) {
         if (!container || !layout) return;
         container.innerHTML = '';
 
-        layout.forEach((comp, index) => {
+        for (const [index, comp] of layout.entries()) {
             const section = document.createElement('section');
             section.className = `page-section section-${comp.type}`;
             section.setAttribute('data-comp-index', index);
@@ -77,10 +78,9 @@ const PageRenderer = {
                 case 'categories':
                     section.innerHTML = this.templateCategories(comp);
                     break;
+                case 'products':
                 case 'product_list':
-                    section.innerHTML = this.templateProductList(comp);
-                    // 異步載入商品內容
-                    this.loadProductsForSection(section, comp);
+                    await this.renderProducts(section, comp);
                     break;
                 case 'info_section':
                     section.innerHTML = this.templateInfoSection(comp);
@@ -90,7 +90,7 @@ const PageRenderer = {
                     break;
             }
             container.appendChild(section);
-        });
+        }
 
         // 重新觀察新加入的元素 (動畫)
         if (typeof observeElements === 'function') observeElements();
@@ -168,7 +168,15 @@ const PageRenderer = {
         `;
     },
 
-    loadProductsForSection: async function (section, comp) {
+    renderProducts: async function (section, comp) {
+        section.innerHTML = `
+            <div class="section-container">
+                ${comp.title ? `<h2 class="section-title">${comp.title}</h2>` : ''}
+                <div class="products-grid">
+                    <div class="loading">載入商品中...</div>
+                </div>
+            </div>
+        `;
         const grid = section.querySelector('.products-grid');
         if (!grid) return;
 
@@ -202,6 +210,8 @@ const PageRenderer = {
             }
 
             display.forEach(p => {
+                // 確保 p.id 存在且 p.image 是字串
+                if (!p.id) p.id = 'PID-' + Math.random().toString(36).substr(2, 5);
                 const card = this.createFallbackProductCard(p);
                 grid.appendChild(card);
             });
@@ -214,24 +224,47 @@ const PageRenderer = {
     createFallbackProductCard: function (p) {
         const card = document.createElement('div');
         card.className = 'product-card';
-        // 處理多圖與缺圖
+        card.setAttribute('data-id', p.id);
+        // 點擊卡片開啟詳情
+        card.onclick = () => { if (typeof showProductDetail === 'function') showProductDetail(p.id); };
+
+        // 處理多圖與缺圖 (確保 image 是字串)
         let imageUrl = 'https://via.placeholder.com/400?text=No+Image';
-        if (p.image) {
-            const firstImg = p.image.split(',')[0].trim();
-            if (firstImg) imageUrl = firstImg;
+        const rawImg = p.image || p.prodImage || p.img || '';
+        const imgStr = String(rawImg).trim();
+
+        if (imgStr && imgStr !== '' && imgStr !== 'undefined' && imgStr !== 'null') {
+            const firstImg = imgStr.split(',')[0].trim();
+            if (firstImg) {
+                imageUrl = firstImg;
+            }
+        }
+
+        // 偵錯日誌
+        if (typeof PageRenderer._debugDone === 'undefined') {
+            console.log('[PageRenderer Debug] 第一件商品圖片原始資料:', rawImg);
+            console.log('[PageRenderer Debug] 解析出的圖片網址:', imageUrl);
+            PageRenderer._debugDone = true;
         }
 
         const hasOptions = p.options && (typeof p.options === 'string' ? p.options !== '{}' : Object.keys(p.options).length > 0);
         const btnText = hasOptions ? '選擇規格' : '加入購物車';
 
+        // 按鈕點擊事件
+        const btnAction = hasOptions
+            ? `showProductDetail('${p.id}')`
+            : `addToCartById('${p.id}')`;
+
         card.innerHTML = `
-            <div class="product-image">
-                <img src="${imageUrl}" alt="${p.name}" loading="lazy" onerror="this.src='https://via.placeholder.com/400?text=Image+Error'">
+            <div class="product-image" style="width:100%; aspect-ratio:1/1; background:#f5f5f5; border-radius:12px; overflow:hidden; margin-bottom:15px;">
+                <img src="${imageUrl}" alt="${p.name}" loading="lazy" 
+                     style="width:100%; height:100%; object-fit:cover; display:block;"
+                     onerror="this.onerror=null; this.src='https://via.placeholder.com/400?text=Image+Error';">
             </div>
             <div class="product-info">
-                <h3 class="product-name">${p.name}</h3>
-                <div class="product-price">NT$ ${p.price || 0}</div>
-                <button class="product-btn">${btnText}</button>
+                <h3 class="product-name" style="font-size:1.1rem; font-weight:500; margin-bottom:8px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; height:2.8em; line-height:1.4;">${p.name}</h3>
+                <div class="product-price" style="font-weight:600; font-size:1.1rem; margin-bottom:12px;">NT$ ${p.price || 0}</div>
+                <button class="product-btn" onclick="event.stopPropagation(); ${btnAction}" style="width:100%; padding:10px; background:#D68C94; color:white; border:none; border-radius:30px; cursor:pointer;">${btnText}</button>
             </div>
         `;
         return card;
