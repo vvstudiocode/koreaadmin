@@ -8,8 +8,25 @@ const PageRenderer = {
         const container = document.getElementById('pageBuilderRoot');
         if (!container) return;
 
+        // 1. 立即從快取讀取並渲染 (防止閃爍)
+        const cachedLayout = localStorage.getItem('omo_cached_layout');
+        if (cachedLayout) {
+            try {
+                this.render(container, JSON.parse(cachedLayout));
+            } catch (e) { console.error('Cache parse error', e); }
+        } else {
+            // 如果沒快取，顯示載入狀態
+            container.innerHTML = '<div class="section-container" style="padding: 100px 0; text-align: center; opacity: 0.5;">載入自訂排版中...</div>';
+        }
+
+        // 2. 非同步從後端獲取最新排版
         const layout = await this.fetchLayout();
-        this.render(container, layout);
+        if (layout) {
+            // 更新快取
+            localStorage.setItem('omo_cached_layout', JSON.stringify(layout));
+            // 重新渲染最新內容
+            this.render(container, layout);
+        }
     },
 
     fetchLayout: async function () {
@@ -197,15 +214,19 @@ const PageRenderer = {
     createFallbackProductCard: function (p) {
         const card = document.createElement('div');
         card.className = 'product-card';
-        // 處理多圖
-        const imageUrl = p.image ? p.image.split(',')[0] : 'https://via.placeholder.com/300';
+        // 處理多圖與缺圖
+        let imageUrl = 'https://via.placeholder.com/400?text=No+Image';
+        if (p.image) {
+            const firstImg = p.image.split(',')[0].trim();
+            if (firstImg) imageUrl = firstImg;
+        }
 
         const hasOptions = p.options && (typeof p.options === 'string' ? p.options !== '{}' : Object.keys(p.options).length > 0);
         const btnText = hasOptions ? '選擇規格' : '加入購物車';
 
         card.innerHTML = `
             <div class="product-image">
-                <img src="${imageUrl}" alt="${p.name}">
+                <img src="${imageUrl}" alt="${p.name}" loading="lazy" onerror="this.src='https://via.placeholder.com/400?text=Image+Error'">
             </div>
             <div class="product-info">
                 <h3 class="product-name">${p.name}</h3>
