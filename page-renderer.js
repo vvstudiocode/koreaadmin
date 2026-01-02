@@ -50,7 +50,7 @@ const PageRenderer = {
                 { type: 'categories' },
                 {
                     type: 'products',
-                    title: '精選推薦',
+                    title: '輪播圖',
                     category: '全部',
                     limit: 8
                 },
@@ -221,7 +221,7 @@ const PageRenderer = {
         return `
             <div class="section-container">
                 <div class="section-header">
-                    <h2>${comp.title || '精選商品'}</h2>
+                    <h2>${comp.title || '輪播圖'}</h2>
                     <a href="#" class="view-all">查看全部 →</a>
                 </div>
                 <div class="products-grid" id="grid-${Math.random().toString(36).substr(2, 9)}">
@@ -249,16 +249,32 @@ const PageRenderer = {
     },
 
     renderProducts: async function (section, comp) {
+        // 決定是否使用輪播（products 類型用輪播，product_list 用 grid）
+        const useCarousel = comp.type === 'products';
+
         section.innerHTML = `
             <div class="section-container">
                 ${comp.title ? `<h2 class="section-title">${comp.title}</h2>` : ''}
-                <div class="products-grid">
-                    <div class="loading">載入商品中...</div>
-                </div>
+                ${useCarousel ? `
+                    <div class="products-carousel-wrapper">
+                        <button class="carousel-nav prev" onclick="PageRenderer.scrollCarousel(this, -1)">‹</button>
+                        <div class="products-carousel">
+                            <div class="loading">載入商品中...</div>
+                        </div>
+                        <button class="carousel-nav next" onclick="PageRenderer.scrollCarousel(this, 1)">›</button>
+                    </div>
+                ` : `
+                    <div class="products-grid">
+                        <div class="loading">載入商品中...</div>
+                    </div>
+                `}
             </div>
         `;
-        const grid = section.querySelector('.products-grid');
-        if (!grid) return;
+
+        const container = useCarousel
+            ? section.querySelector('.products-carousel')
+            : section.querySelector('.products-grid');
+        if (!container) return;
 
         try {
             // 兼容性處理：在後台使用 currentProducts，在前端使用 products
@@ -283,9 +299,9 @@ const PageRenderer = {
             const limit = parseInt(comp.limit) || 4;
             const display = filtered.slice(0, limit);
 
-            grid.innerHTML = '';
+            container.innerHTML = '';
             if (display.length === 0) {
-                grid.innerHTML = '<div class="empty-msg">此分類暫無商品</div>';
+                container.innerHTML = '<div class="empty-msg">此分類暫無商品</div>';
                 return;
             }
 
@@ -293,12 +309,57 @@ const PageRenderer = {
                 // 確保 p.id 存在且 p.image 是字串
                 if (!p.id) p.id = 'PID-' + Math.random().toString(36).substr(2, 5);
                 const card = this.createFallbackProductCard(p);
-                grid.appendChild(card);
+                container.appendChild(card);
             });
+
+            // 為輪播添加觸控滑動支援
+            if (useCarousel) {
+                this.initCarouselTouch(container);
+            }
         } catch (err) {
             console.error('Failed to load products for section:', err);
-            grid.innerHTML = '<div class="error-msg">載入失敗</div>';
+            container.innerHTML = '<div class="error-msg">載入失敗</div>';
         }
+    },
+
+    // 輪播滑動功能
+    scrollCarousel: function (btn, direction) {
+        const wrapper = btn.closest('.products-carousel-wrapper');
+        const carousel = wrapper.querySelector('.products-carousel');
+        const scrollAmount = 300; // 每次滾動的距離
+        carousel.scrollBy({ left: direction * scrollAmount, behavior: 'smooth' });
+    },
+
+    // 觸控滑動支援
+    initCarouselTouch: function (carousel) {
+        let isDown = false;
+        let startX;
+        let scrollLeft;
+
+        carousel.addEventListener('mousedown', (e) => {
+            isDown = true;
+            carousel.style.cursor = 'grabbing';
+            startX = e.pageX - carousel.offsetLeft;
+            scrollLeft = carousel.scrollLeft;
+        });
+
+        carousel.addEventListener('mouseleave', () => {
+            isDown = false;
+            carousel.style.cursor = 'grab';
+        });
+
+        carousel.addEventListener('mouseup', () => {
+            isDown = false;
+            carousel.style.cursor = 'grab';
+        });
+
+        carousel.addEventListener('mousemove', (e) => {
+            if (!isDown) return;
+            e.preventDefault();
+            const x = e.pageX - carousel.offsetLeft;
+            const walk = (x - startX) * 2;
+            carousel.scrollLeft = scrollLeft - walk;
+        });
     },
 
     createFallbackProductCard: function (p) {
