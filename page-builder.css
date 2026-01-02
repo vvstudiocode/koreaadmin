@@ -378,7 +378,9 @@
 }
 
 .preview-container.mobile .card-img-box {
-    min-height: 120px !important;
+    min-height: auto !important;
+    height: auto !important;
+    aspect-ratio: 1 / 1 !important;
 }
 
 .preview-container.mobile .product-card h3 {
