@@ -198,14 +198,176 @@ const PageBuilder = {
             this.addInnerField(container, '按鈕文字', 'buttonText', comp.buttonText);
             this.addInnerField(container, '跳轉連結', 'buttonLink', comp.buttonLink);
         } else if (comp.type === 'product_list' || comp.type === 'products') {
+            const isProducts = comp.type === 'products'; // 只有輪播圖支援手動選品
+
+            // 標題輸入
             this.addInnerField(container, '區塊標題', 'title', comp.title);
 
-            // 將分類欄位改為下拉選單
-            const allProducts = typeof products !== 'undefined' ? products : (typeof currentProducts !== 'undefined' ? currentProducts : []);
-            const categories = ['全部', ...new Set(allProducts.map(p => p.category).filter(Boolean))];
-            this.addInnerField(container, '商品分類', 'category', comp.category, 'select', categories);
+            // 商品來源選擇 (僅限輪播圖)
+            if (isProducts) {
+                const sourceWrapper = document.createElement('div');
+                sourceWrapper.style.marginBottom = '15px';
+                sourceWrapper.innerHTML = '<label style="display:block;margin-bottom:5px;font-size:14px;color:#555;">商品來源</label>';
 
-            this.addInnerField(container, '顯示數量', 'limit', comp.limit || 4, 'number');
+                const select = document.createElement('select');
+                select.style.cssText = 'width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;';
+                select.innerHTML = `
+                    <option value="category" ${(!comp.sourceType || comp.sourceType === 'category') ? 'selected' : ''}>分類篩選</option>
+                    <option value="manual" ${comp.sourceType === 'manual' ? 'selected' : ''}>手動選擇</option>
+                `;
+
+                select.onchange = (e) => {
+                    this.layout[index].sourceType = e.target.value;
+                    // 初始化 productIds 陣列
+                    if (e.target.value === 'manual' && !this.layout[index].productIds) {
+                        this.layout[index].productIds = [];
+                    }
+                    this.renderInlineForm(container, this.layout[index], index); // 重新渲染表單
+                    this.updatePreview();
+                };
+
+                sourceWrapper.appendChild(select);
+                container.appendChild(sourceWrapper);
+            }
+
+            const sourceType = comp.sourceType || 'category';
+
+            if (sourceType === 'category' || !isProducts) {
+                // 分類選擇 (原有邏輯)
+                const catWrapper = document.createElement('div');
+                catWrapper.style.marginBottom = '15px';
+                catWrapper.innerHTML = '<label style="display:block;margin-bottom:5px;font-size:14px;color:#555;">選擇分類</label>';
+
+                const catSelect = document.createElement('select');
+                catSelect.style.cssText = 'width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;';
+
+                // 獲取所有分類
+                const allProducts = typeof products !== 'undefined' ? products : (typeof currentProducts !== 'undefined' ? currentProducts : []);
+                const categories = ['全部', ...new Set(allProducts.map(p => p.category).filter(Boolean))];
+
+                catSelect.innerHTML = categories.map(c =>
+                    `<option value="${c}" ${comp.category === c ? 'selected' : ''}>${c}</option>`
+                ).join('');
+
+                catSelect.onchange = (e) => {
+                    this.layout[index].category = e.target.value;
+                    this.updatePreview();
+                };
+
+                catWrapper.appendChild(catSelect);
+                container.appendChild(catWrapper);
+
+                // 顯示數量限制
+                this.addInnerField(container, '顯示數量', 'limit', comp.limit || 4, 'number');
+            } else {
+                // 手動選擇介面
+                const manualWrapper = document.createElement('div');
+                manualWrapper.style.marginBottom = '15px';
+                manualWrapper.style.padding = '10px';
+                manualWrapper.style.background = '#f9f9f9';
+                manualWrapper.style.borderRadius = '8px';
+
+                // 1. 搜尋/新增商品
+                const searchInput = document.createElement('input');
+                searchInput.placeholder = '搜尋商品名稱...';
+                searchInput.style.cssText = 'width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; margin-bottom:10px;';
+
+                // 建立搜尋結果選單
+                const resultList = document.createElement('div');
+                resultList.style.cssText = 'max-height:150px; overflow-y:auto; border:1px solid #eee; background:white; display:none; margin-bottom:10px; border-radius:4px; position:absolute; width: 90%; z-index: 10; padding:5px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);';
+
+                // 相對定位容器以便放置下拉選單
+                const relativeBox = document.createElement('div');
+                relativeBox.style.position = 'relative';
+                relativeBox.appendChild(searchInput);
+                relativeBox.appendChild(resultList);
+                manualWrapper.appendChild(relativeBox);
+
+                const allProducts = typeof products !== 'undefined' ? products : (typeof currentProducts !== 'undefined' ? currentProducts : []);
+
+                searchInput.oninput = (e) => {
+                    const term = e.target.value.toLowerCase();
+                    if (!term) {
+                        resultList.style.display = 'none';
+                        return;
+                    }
+
+                    const matches = allProducts.filter(p =>
+                        p.name.toLowerCase().includes(term) &&
+                        !comp.productIds?.includes(p.id) // 排除已選的
+                    );
+
+                    if (matches.length > 0) {
+                        resultList.innerHTML = matches.map(p => {
+                            const img = (p.image || '').split(',')[0];
+                            return `
+                            <div class="search-item" style="padding:8px; cursor:pointer; border-bottom:1px solid #f0f0f0; display:flex; align-items:center; gap:8px;" data-id="${p.id}">
+                                <img src="${img}" style="width:30px;height:30px;object-fit:cover;border-radius:4px; background:#eee;">
+                                <div style="font-size:13px; flex:1;">
+                                    <div style="font-weight:bold;">${p.name}</div>
+                                    <div style="font-size:12px; color:#888;">$${p.price}</div>
+                                </div>
+                            </div>
+                        `}).join('');
+                        resultList.style.display = 'block';
+
+                        // 綁定點擊事件
+                        resultList.querySelectorAll('.search-item').forEach(item => {
+                            item.onclick = () => {
+                                if (!this.layout[index].productIds) this.layout[index].productIds = [];
+                                this.layout[index].productIds.push(item.dataset.id);
+                                searchInput.value = '';
+                                resultList.style.display = 'none';
+                                this.renderInlineForm(container, this.layout[index], index); // 重繪以更新列表
+                                this.updatePreview();
+                            };
+                        });
+                    } else {
+                        resultList.innerHTML = '<div style="padding:8px; color:#999; font-size:13px;">找不到商品</div>';
+                        resultList.style.display = 'block';
+                    }
+                };
+
+                // 點擊外部關閉搜尋結果 (簡單版：點擊 input 才顯示)
+                searchInput.onfocus = () => { if (searchInput.value) resultList.style.display = 'block'; };
+
+                // 2. 已選商品列表
+                manualWrapper.innerHTML += '<label style="display:block;margin-bottom:5px;font-size:13px;color:#555; margin-top:10px;">已選商品</label>';
+                const selectedList = document.createElement('div');
+
+                if (comp.productIds && comp.productIds.length > 0) {
+                    comp.productIds.forEach((pid, pidIdx) => {
+                        const product = allProducts.find(p => String(p.id) === String(pid));
+                        if (product) {
+                            const item = document.createElement('div');
+                            item.style.cssText = 'display:flex; align-items:center; gap:10px; background:white; padding:8px; border:1px solid #eee; margin-bottom:5px; border-radius:4px; user-select:none;';
+                            item.innerHTML = `
+                                <span style="color:#ccc; cursor:move;">☰</span>
+                                <img src="${(product.image || '').split(',')[0]}" style="width:40px;height:40px;object-fit:cover;border-radius:4px; background:#eee;">
+                                <div style="flex:1; overflow:hidden;">
+                                    <div style="font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${product.name}</div>
+                                    <div style="font-size:12px; color:#888;">$${product.price}</div>
+                                </div>
+                                <button style="background:none; border:none; color:#ff4d4f; cursor:pointer; font-size:18px;">×</button>
+                            `;
+
+                            // 移除按鈕
+                            item.querySelector('button').onclick = () => {
+                                this.layout[index].productIds.splice(pidIdx, 1);
+                                this.renderInlineForm(container, this.layout[index], index);
+                                this.updatePreview();
+                            };
+
+                            selectedList.appendChild(item);
+                        }
+                    });
+                } else {
+                    selectedList.innerHTML = '<div style="text-align:center; padding:10px; color:#aaa; font-size:13px;">尚未選擇商品</div>';
+                }
+
+                manualWrapper.appendChild(selectedList);
+                container.appendChild(manualWrapper);
+            }
         } else if (comp.type === 'announcement') {
             this.addInnerField(container, '公告內容', 'text', comp.text);
             this.addInnerField(container, '背景顏色', 'bgColor', comp.bgColor || '#f3f4f6', 'color');
@@ -545,14 +707,15 @@ const PageBuilder = {
         this.renderPreview();
     },
 
-    renderPreview: function () {
+    renderPreview: async function () {
         const container = document.getElementById('pageBuilderPreviewRoot');
         if (!container) return;
 
         if (typeof PageRenderer !== 'undefined') {
-            PageRenderer.render(container, this.layout);
+            // 等待主要內容渲染完成
+            await PageRenderer.render(container, this.layout);
 
-            // 渲染頁尾預覽區塊
+            // 渲染頁尾預覽區塊 (確保在最後)
             if (this.footer) {
                 this.renderFooterPreview(container);
             }
@@ -596,6 +759,8 @@ const PageBuilder = {
             `<div style="text-align:center; font-size:12px; color:#999;">${this.footer.copyright}</div>` : '';
 
         footerSection.innerHTML = noticesHTML + socialHTML + copyrightHTML;
+
+        // 確保 footer 真的在最後面 (以防萬一)
         container.appendChild(footerSection);
     },
 
