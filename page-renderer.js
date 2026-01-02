@@ -399,7 +399,7 @@ const PageRenderer = {
         // 使用 DOM 建立元素避免 HTML 跳脫問題
         const imgBox = document.createElement('div');
         imgBox.className = 'card-img-box';
-        imgBox.style.cssText = 'width:100%; aspect-ratio:1/1; background:#f5f5f5; border-radius:12px; overflow:hidden; margin-bottom:15px; position:relative; min-height:250px;';
+        imgBox.style.cssText = 'width:100%; aspect-ratio:1/1; background:#f5f5f5; border-radius:12px; overflow:hidden; margin-bottom:15px; position:relative;';
 
         const img = document.createElement('img');
         img.src = imageUrl;
