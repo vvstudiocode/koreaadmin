@@ -751,6 +751,27 @@ body {
     background: rgba(255, 0, 0, 1);
 }
 
+.image-preview-item.existing {
+    border-color: #ddd;
+}
+
+.image-preview-item.new {
+    border-color: var(--accent);
+    border-style: solid;
+}
+
+.image-preview-item.new::after {
+    content: '新';
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: var(--accent);
+    color: white;
+    font-size: 10px;
+    padding: 2px 4px;
+    border-top-left-radius: 4px;
+}
+
 .upload-btn {
     width: 100%;
     margin-top: 1rem;
@@ -1367,4 +1388,51 @@ body.sidebar-open {
 
 .purchasing-detail-item:last-child {
     border-bottom: none;
+}
+
+/* 規格產生器樣式 */
+.spec-builder-container {
+    background: #f9f9f9;
+    padding: 0.75rem;
+    border-radius: 6px;
+    border: 1px solid #eee;
+    margin-bottom: 5px;
+}
+
+.spec-group-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    align-items: center;
+}
+
+.spec-group-row input {
+    margin-bottom: 0 !important;
+}
+
+.spec-group-row .group-name {
+    flex: 1;
+}
+
+.spec-group-row .group-values {
+    flex: 2;
+}
+
+.spec-group-row .remove-btn {
+    background: #ff4757;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.spec-group-row .remove-btn:hover {
+    background: #ff6b81;
 }
