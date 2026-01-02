@@ -1,10 +1,15 @@
 /**
- * Modular Page Renderer (Visual Version)
- * Dynamically builds the homepage based on JSON layout.
+ * Modular Page Renderer (Visual Version) v2.0
+ * - GitHub Direct Access for faster loading
+ * - Footer section rendering
+ * - Dynamic spacing support
  */
 const PageRenderer = {
+    // GitHub Raw URL for layout config
+    LAYOUT_URL: 'https://raw.githubusercontent.com/vvstudiocode/korea/main/layout.json',
+
     init: async function () {
-        console.log('🚀 PageRenderer Initialized');
+        console.log('🚀 PageRenderer v2.0 Initialized');
         const container = document.getElementById('pageBuilderRoot');
         if (!container) return;
 
@@ -12,72 +17,98 @@ const PageRenderer = {
         const cachedLayout = localStorage.getItem('omo_cached_layout');
         if (cachedLayout) {
             try {
-                this.render(container, JSON.parse(cachedLayout));
+                const parsed = JSON.parse(cachedLayout);
+                this.render(container, parsed.sections || parsed);
+                this.renderFooter(parsed.footer);
             } catch (e) { console.error('Cache parse error', e); }
         } else {
             // 如果沒快取，顯示載入狀態
             container.innerHTML = '<div class="section-container" style="padding: 100px 0; text-align: center; opacity: 0.5;">載入自訂排版中...</div>';
         }
 
-        // 2. 非同步從後端獲取最新排版
+        // 2. 非同步從 GitHub 獲取最新排版
         const layout = await this.fetchLayout();
         if (layout) {
             // 更新快取
             localStorage.setItem('omo_cached_layout', JSON.stringify(layout));
             // 重新渲染最新內容
-            this.render(container, layout);
+            this.render(container, layout.sections || layout);
+            this.renderFooter(layout.footer);
         }
     },
 
     fetchLayout: async function () {
-        // 【正式環境建議直接修改此處】直接在代碼中定義排版，速度最快且最穩定
-        const HARDCODED_LAYOUT = [
-            {
-                type: 'hero',
-                title: 'Welcome to OMO Select',
-                subtitle: 'Discover the best Korean products',
-                image: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=1200'
-            },
-            { type: 'categories' },
-            {
-                type: 'products',
-                title: '精選推薦',
-                category: '全部',
-                limit: 8
-            },
-            {
-                type: 'product_list',
-                title: '最新商品',
-                category: '全部',
-                limit: 20
-            }
-        ];
+        // 預設排版 (fallback)
+        const FALLBACK_LAYOUT = {
+            sections: [
+                {
+                    type: 'hero',
+                    title: 'Welcome to OMO Select',
+                    subtitle: 'Discover the best Korean products',
+                    image: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=1200'
+                },
+                { type: 'categories' },
+                {
+                    type: 'products',
+                    title: '精選推薦',
+                    category: '全部',
+                    limit: 8
+                },
+                {
+                    type: 'product_list',
+                    title: '最新商品',
+                    category: '全部',
+                    limit: 20
+                }
+            ],
+            footer: null
+        };
 
         try {
-            const apiUrl = typeof GAS_API_URL !== 'undefined' ? GAS_API_URL : '';
-            if (!apiUrl) return HARDCODED_LAYOUT;
-
-            // 嘗試從後端抓取更新 (異步，不阻塞預設顯示)
-            const response = await fetch(`${apiUrl}?action=getSiteSettings`);
-            const result = await response.json();
-            if (result.success && result.data.settings && result.data.settings.homepage_layout) {
-                return JSON.parse(result.data.settings.homepage_layout);
+            // 優先從 GitHub Raw 直接讀取 (加上時間戳避免快取)
+            const response = await fetch(this.LAYOUT_URL + '?_=' + Date.now());
+            if (response.ok) {
+                const data = await response.json();
+                console.log('✅ Layout loaded from GitHub');
+                return data;
             }
         } catch (err) {
-            console.warn('⚠️ Fetching remote layout failed, using hardcoded local version.');
+            console.warn('⚠️ GitHub fetch failed, trying GAS API...');
         }
 
-        return HARDCODED_LAYOUT;
+        // Fallback: 嘗試從 GAS API 讀取
+        try {
+            const apiUrl = typeof GAS_API_URL !== 'undefined' ? GAS_API_URL : '';
+            if (apiUrl) {
+                const response = await fetch(`${apiUrl}?action=getSiteSettings`);
+                const result = await response.json();
+                if (result.success && result.data.settings && result.data.settings.homepage_layout) {
+                    const sections = JSON.parse(result.data.settings.homepage_layout);
+                    return { sections: sections, footer: null };
+                }
+            }
+        } catch (err) {
+            console.warn('⚠️ GAS API also failed, using fallback layout.');
+        }
+
+        return FALLBACK_LAYOUT;
     },
 
     render: async function (container, layout) {
         if (!container || !layout) return;
         container.innerHTML = '';
 
-        for (const [index, comp] of layout.entries()) {
+        // 支援傳入 sections 陣列或完整 layout 物件
+        const sections = Array.isArray(layout) ? layout : (layout.sections || layout);
+
+        for (const [index, comp] of sections.entries()) {
             const section = document.createElement('section');
             section.className = `page-section section-${comp.type}`;
             section.setAttribute('data-comp-index', index);
+
+            // 套用動態間距
+            if (comp.marginTop) section.style.marginTop = comp.marginTop + 'px';
+            if (comp.marginBottom) section.style.marginBottom = comp.marginBottom + 'px';
 
             switch (comp.type) {
                 case 'hero':
@@ -102,6 +133,47 @@ const PageRenderer = {
 
         // 重新觀察新加入的元素 (動畫)
         if (typeof observeElements === 'function') observeElements();
+    },
+
+    // 渲染頁尾區塊
+    renderFooter: function (footerData) {
+        const footer = document.querySelector('.site-footer');
+        if (!footer || !footerData) return;
+
+        // 渲染購買須知
+        const footerSection = footer.querySelector('.footer-section ul');
+        if (footerSection && footerData.notices && footerData.notices.length > 0) {
+            footerSection.innerHTML = footerData.notices.map(notice => `
+                <li class="section-header"><strong>${notice.title}</strong></li>
+                ${notice.content.split('\n').map(line => `<li>${line}</li>`).join('')}
+            `).join('');
+        }
+
+        // 渲染社群連結
+        const socialIcons = footer.querySelector('.social-icons');
+        if (socialIcons && footerData.socialLinks) {
+            const links = footerData.socialLinks;
+            socialIcons.innerHTML = `
+                ${links.line ? `<a href="${links.line}" target="_blank" rel="noopener noreferrer">
+                    <img src="https://raw.githubusercontent.com/vvstudiocode/korea/main/line.png" alt="Line">
+                </a>` : ''}
+                ${links.instagram ? `<a href="${links.instagram}" target="_blank" rel="noopener noreferrer">
+                    <img src="https://raw.githubusercontent.com/vvstudiocode/korea/main/instagram.png" alt="Instagram">
+                </a>` : ''}
+                ${links.threads ? `<a href="${links.threads}" target="_blank" rel="noopener noreferrer">
+                    <img src="https://raw.githubusercontent.com/vvstudiocode/korea/main/threads.png" alt="Threads">
+                </a>` : ''}
+            `;
+        }
+
+        // 渲染版權聲明
+        const copyright = footer.querySelector('.footer-copyright');
+        if (copyright && footerData.copyright) {
+            // 保留社群連結 div，只更新文字
+            const socialDiv = copyright.querySelector('.social-icons');
+            const socialHTML = socialDiv ? socialDiv.outerHTML : '';
+            copyright.innerHTML = socialHTML + '\n' + footerData.copyright;
+        }
     },
 
     templateAnnouncement: function (comp) {
