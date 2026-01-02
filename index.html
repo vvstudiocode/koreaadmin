@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OMO Select - 後台管理系統</title>
     <link rel="stylesheet" href="admin.css">
+    <link rel="stylesheet" href="page-renderer.css">
+    <link rel="stylesheet" href="page-builder.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap"
@@ -36,6 +38,7 @@
                 <li id="tab-dashboard" class="active" onclick="switchTab('dashboard')">總覽報表</li>
                 <li id="tab-orders" onclick="switchTab('orders')">訂單管理</li>
                 <li id="tab-products" onclick="switchTab('products')">商品管理</li>
+                <li id="tab-builder" onclick="switchTab('builder')">首頁排版</li>
                 <li id="tab-purchasing" onclick="switchTab('purchasing')">採買統計</li>
                 <li id="tab-settings" onclick="switchTab('settings')">網站設定</li>
             </ul>
@@ -259,10 +262,47 @@
 
             <!-- 4. 網站設定視圖 -->
             <div id="settingsView" class="view-section" style="display: none;">
+                <div id="settingsForm"></div>
             </div>
-    </div>
-    </div>
-    </main>
+
+            <!-- 首頁排版編輯器 (升級版) -->
+            <div id="builderSection" class="view-section"
+                style="display: none; padding: 0; height: calc(100vh - 70px);">
+                <div class="visual-builder">
+                    <!-- 左側：編輯區 -->
+                    <div class="builder-sidebar">
+                        <div class="sidebar-header">
+                            <h3>區塊管理</h3>
+                            <button class="add-btn-circle" onclick="openModal('addCompModal')" title="新增區塊">+</button>
+                        </div>
+                        <div class="components-list" id="builderComponentsList">
+                            <!-- 由 page-builder.js 動態產生 -->
+                        </div>
+                        <div class="sidebar-footer">
+                            <button class="save-btn" id="saveLayoutBtn" onclick="PageBuilder.saveLayout()">儲存排版</button>
+                        </div>
+                    </div>
+
+                    <!-- 右側：預覽區 -->
+                    <div class="builder-preview">
+                        <div class="preview-toolbar">
+                            <div class="device-toggles">
+                                <button class="device-btn active" id="view-desktop"
+                                    onclick="PageBuilder.setPreviewMode('desktop')">💻 電腦版</button>
+                                <button class="device-btn" id="view-mobile"
+                                    onclick="PageBuilder.setPreviewMode('mobile')">📱 手機版</button>
+                            </div>
+                            <div class="preview-status">即時預覽中</div>
+                        </div>
+                        <div class="preview-viewport" id="previewViewport">
+                            <div class="preview-container" id="pageBuilderPreviewRoot">
+                                <!-- 由 page-renderer.js 動態渲染 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
 
     <!-- 訂單詳情 Modal (可編輯版) -->
@@ -526,9 +566,49 @@
         </div>
     </div>
 
+    </div>
+
+    <!-- 新增區塊模態框 -->
+    <div class="modal" id="addCompModal">
+        <div class="modal-content" style="width: 500px;">
+            <h3>選擇要新增的區塊類型</h3>
+            <div class="component-selector">
+                <div class="comp-type-btn" onclick="PageBuilder.addComponent('hero'); closeModal('addCompModal')">
+                    <span class="icon">🖼️</span>
+                    <span>首頁大圖</span>
+                </div>
+                <div class="comp-type-btn" onclick="PageBuilder.addComponent('categories'); closeModal('addCompModal')">
+                    <span class="icon">🗄️</span>
+                    <span>分類導覽</span>
+                </div>
+                <div class="comp-type-btn"
+                    onclick="PageBuilder.addComponent('product_list'); closeModal('addCompModal')">
+                    <span class="icon">🛍️</span>
+                    <span>精選商品</span>
+                </div>
+                <div class="comp-type-btn"
+                    onclick="PageBuilder.addComponent('info_section'); closeModal('addCompModal')">
+                    <span class="icon">📝</span>
+                    <span>圖文介紹</span>
+                </div>
+                <div class="comp-type-btn"
+                    onclick="PageBuilder.addComponent('announcement'); closeModal('addCompModal')">
+                    <span class="icon">📢</span>
+                    <span>公告欄</span>
+                </div>
+            </div>
+            <div class="modal-actions" style="margin-top:2rem;">
+                <button onclick="closeModal('addCompModal')">取消</button>
+            </div>
+        </div>
+    </div>
+
+
     <!-- Toast 通知容器 -->
     <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 10000;"></div>
 
+    <script src="page-renderer.js"></script>
+    <script src="page-builder.js"></script>
     <script src="admin.js"></script>
 </body>
 
