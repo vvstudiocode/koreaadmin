@@ -168,7 +168,15 @@ function switchTab(tabId) {
     } else if (tabId === 'builder') {
         document.getElementById('builderSection').style.display = 'block';
         document.getElementById('pageTitle').textContent = '首頁排版管理';
-        if (typeof PageBuilder !== 'undefined') PageBuilder.init();
+        if (typeof PageBuilder !== 'undefined') {
+            if (!PageBuilder._hasStarted) {
+                PageBuilder.init();
+                PageBuilder._hasStarted = true;
+            } else {
+                // 如果已經初始化過，只需確保預覽正確渲染
+                PageBuilder.renderPreview();
+            }
+        }
     } else if (tabId === 'settings') {
         document.getElementById('settingsView').style.display = 'block';
         document.getElementById('pageTitle').textContent = '網站設定';
