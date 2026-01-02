@@ -177,8 +177,9 @@ const PageRenderer = {
     },
 
     templateAnnouncement: function (comp) {
+        const bgStyle = comp.bgTransparent ? 'background: transparent; border-bottom:1px solid #eee;' : `background-color: ${comp.bgColor || '#f3f4f6'};`;
         return `
-            <div class="announcement-bar" style="background-color: ${comp.bgColor || '#f3f4f6'}">
+            <div class="announcement-bar" style="${bgStyle} text-align: ${comp.textAlign || 'center'}">
                 <div class="announcement-content">
                     ✨ ${comp.text || '歡迎光臨 OMO Select！'} ✨
                 </div>
@@ -187,9 +188,11 @@ const PageRenderer = {
     },
 
     templateHero: function (comp) {
+        const align = comp.textAlign || 'center';
+        const alignItems = align === 'left' ? 'flex-start' : (align === 'right' ? 'flex-end' : 'center');
         return `
             <div class="hero-banner" style="background-image: linear-gradient(to bottom, rgba(0,0,0,0.2), rgba(0,0,0,0.4)), url('${comp.image}')">
-                <div class="hero-content">
+                <div class="hero-content" style="text-align: ${align}; align-items: ${alignItems}">
                     <h1>${comp.title || ''}</h1>
                     <p>${comp.subtitle || ''}</p>
                     ${comp.buttonText ? `<a href="${comp.buttonLink || '#'}" class="cta-button">${comp.buttonText}</a>` : ''}
@@ -209,7 +212,7 @@ const PageRenderer = {
 
         return `
             <div class="section-container">
-                ${comp.title ? `<div class="section-header"><h2>${comp.title}</h2></div>` : ''}
+                ${comp.title ? `<div class="section-header" style="text-align:${comp.textAlign || 'left'}"><h2>${comp.title}</h2></div>` : ''}
                 <div class="category-scroll">
                     ${items}
                 </div>
@@ -220,7 +223,7 @@ const PageRenderer = {
     templateProductList: function (comp) {
         return `
             <div class="section-container">
-                <div class="section-header">
+                <div class="section-header" style="text-align:${comp.textAlign || 'left'}; justify-content:${comp.textAlign === 'center' ? 'center' : (comp.textAlign === 'right' ? 'flex-end' : 'space-between')}">
                     <h2>${comp.title || '輪播圖'}</h2>
                     <a href="#" class="view-all">查看全部 →</a>
                 </div>
@@ -238,7 +241,7 @@ const PageRenderer = {
                     <div class="info-image">
                         <img src="${comp.image}" alt="info">
                     </div>
-                    <div class="info-text">
+                    <div class="info-text" style="text-align: ${comp.textAlign || 'left'}">
                         <h3>${comp.title || ''}</h3>
                         <p>${comp.subtitle || ''}</p>
                         ${comp.buttonText ? `<a href="${comp.buttonLink || '#'}" class="text-link">${comp.buttonText}</a>` : ''}
