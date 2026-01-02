@@ -1,416 +1,448 @@
-/* Page Renderer Styles (Premium Visuals) */
-:root {
-    --accent: #ff85a2;
-    --accent-light: #fff0f3;
-    --text-main: #2d3436;
-    --text-sub: #636e72;
-    --bg-light: #fdf2f2;
-}
+/**
+ * Modular Page Renderer (Visual Version) v2.0
+ * - GitHub Direct Access for faster loading
+ * - Footer section rendering
+ * - Dynamic spacing support
+ */
+const PageRenderer = {
+    // GitHub Raw URL for layout config
+    LAYOUT_URL: 'https://raw.githubusercontent.com/vvstudiocode/korea/main/layout.json',
 
-.page-section {
-    padding: 3rem 0;
-    overflow: hidden;
-}
+    init: async function () {
+        console.log('🚀 PageRenderer v2.0 Initialized');
+        const container = document.getElementById('pageBuilderRoot');
+        if (!container) return;
 
-/* 移除第一個區塊如果是大圖時的上間距 */
-.page-section:first-child .hero-banner {
-    margin-top: -3rem;
-}
+        // 1. 立即從快取讀取並渲染 (防止閃爍)
+        const cachedLayout = localStorage.getItem('omo_cached_layout');
+        if (cachedLayout) {
+            try {
+                const parsed = JSON.parse(cachedLayout);
+                this.render(container, parsed.sections || parsed);
+                this.renderFooter(parsed.footer);
+            } catch (e) { console.error('Cache parse error', e); }
+        } else {
+            // 如果沒快取，顯示載入狀態
+            container.innerHTML = '<div class="section-container" style="padding: 100px 0; text-align: center; opacity: 0.5;">載入自訂排版中...</div>';
+        }
 
-/* 或者如果 pageBuilderRoot 本身有 padding */
-#pageBuilderRoot .page-section:first-child {
-    padding-top: 0;
-}
+        // 2. 非同步從 GitHub 獲取最新排版
+        const layout = await this.fetchLayout();
+        if (layout) {
+            // 更新快取
+            localStorage.setItem('omo_cached_layout', JSON.stringify(layout));
+            // 重新渲染最新內容
+            this.render(container, layout.sections || layout);
+            this.renderFooter(layout.footer);
+        }
+    },
 
-.section-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 1.5rem;
-}
+    fetchLayout: async function () {
+        // 預設排版 (fallback)
+        const FALLBACK_LAYOUT = {
+            sections: [
+                {
+                    type: 'hero',
+                    title: 'Welcome to OMO Select',
+                    subtitle: 'Discover the best Korean products',
+                    image: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=1200'
+                },
+                { type: 'categories' },
+                {
+                    type: 'products',
+                    title: '輪播圖',
+                    category: '全部',
+                    limit: 8
+                },
+                {
+                    type: 'product_list',
+                    title: '最新商品',
+                    category: '全部',
+                    limit: 20
+                }
+            ],
+            footer: null
+        };
 
-/* Announcement Bar */
-.announcement-bar {
-    padding: 10px 0;
-    text-align: center;
-    font-size: 0.9rem;
-    font-weight: 500;
-    letter-spacing: 0.5px;
-    color: #444;
-}
+        try {
+            // 優先從 GitHub Raw 直接讀取 (加上時間戳避免快取)
+            const response = await fetch(this.LAYOUT_URL + '?_=' + Date.now());
+            if (response.ok) {
+                const data = await response.json();
+                console.log('✅ Layout loaded from GitHub');
+                return data;
+            }
+        } catch (err) {
+            console.warn('⚠️ GitHub fetch failed, trying GAS API...');
+        }
 
-/* Hero Banner */
-.hero-banner {
-    height: 500px;
-    background-size: cover;
-    background-position: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    text-align: center;
-}
+        // Fallback: 嘗試從 GAS API 讀取
+        try {
+            const apiUrl = typeof GAS_API_URL !== 'undefined' ? GAS_API_URL : '';
+            if (apiUrl) {
+                const response = await fetch(`${apiUrl}?action=getSiteSettings`);
+                const result = await response.json();
+                if (result.success && result.data.settings && result.data.settings.homepage_layout) {
+                    const sections = JSON.parse(result.data.settings.homepage_layout);
+                    return { sections: sections, footer: null };
+                }
+            }
+        } catch (err) {
+            console.warn('⚠️ GAS API also failed, using fallback layout.');
+        }
 
-.hero-content {
-    max-width: 800px;
-    padding: 2rem;
-    animation: fadeInUp 1s ease;
-}
+        return FALLBACK_LAYOUT;
+    },
 
-.hero-content h1 {
-    font-family: 'Playfair Display', serif;
-    font-size: 3.5rem;
-    margin-bottom: 1rem;
-    letter-spacing: -1px;
-}
+    render: async function (container, layout) {
+        if (!container || !layout) return;
+        container.innerHTML = '';
 
-.hero-content p {
-    font-size: 1.2rem;
-    margin-bottom: 2rem;
-    opacity: 0.9;
-}
+        // 支援傳入 sections 陣列或完整 layout 物件
+        const sections = Array.isArray(layout) ? layout : (layout.sections || layout);
 
-.cta-button {
-    display: inline-block;
-    padding: 1rem 2.5rem;
-    background: white;
-    color: var(--text-main);
-    text-decoration: none;
-    border-radius: 50px;
-    font-weight: 600;
-    transition: all 0.3s;
-}
+        for (const [index, comp] of sections.entries()) {
+            const section = document.createElement('section');
+            section.className = `page-section section-${comp.type}`;
+            section.setAttribute('data-comp-index', index);
 
-.cta-button:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-    background: var(--accent);
-    color: white;
-}
+            // 套用動態間距
+            if (comp.marginTop) section.style.marginTop = comp.marginTop + 'px';
+            if (comp.marginBottom) section.style.marginBottom = comp.marginBottom + 'px';
 
-/* Category Scroll */
-.category-scroll {
-    display: flex;
-    gap: 12px;
-    overflow-x: auto;
-    padding: 10px 0;
-    scrollbar-width: none;
-}
+            switch (comp.type) {
+                case 'hero':
+                    section.innerHTML = this.templateHero(comp);
+                    break;
+                case 'categories':
+                    section.innerHTML = this.templateCategories(comp);
+                    break;
+                case 'products':
+                case 'product_list':
+                    await this.renderProducts(section, comp);
+                    break;
+                case 'info_section':
+                    section.innerHTML = this.templateInfoSection(comp);
+                    break;
+                case 'announcement':
+                    section.innerHTML = this.templateAnnouncement(comp);
+                    break;
+            }
+            container.appendChild(section);
+        }
 
-.category-scroll::-webkit-scrollbar {
-    display: none;
-}
+        // 重新觀察新加入的元素 (動畫)
+        if (typeof observeElements === 'function') observeElements();
+    },
 
-.category-pill {
-    white-space: nowrap;
-    padding: 8px 24px;
-    background: white;
-    border: 1px solid #eee;
-    border-radius: 50px;
-    cursor: pointer;
-    transition: all 0.3s;
-    font-weight: 500;
-}
+    // 渲染頁尾區塊
+    renderFooter: function (footerData) {
+        const footer = document.querySelector('.site-footer');
+        if (!footer || !footerData) return;
 
-.category-pill:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-    background: var(--accent-light);
-}
+        // 渲染購買須知
+        const footerSection = footer.querySelector('.footer-section ul');
+        if (footerSection && footerData.notices && footerData.notices.length > 0) {
+            footerSection.innerHTML = footerData.notices.map(notice => `
+                <li class="section-header"><strong>${notice.title}</strong></li>
+                ${notice.content.split('\n').map(line => `<li>${line}</li>`).join('')}
+            `).join('');
+        }
 
-/* Section Header */
-.section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    margin-bottom: 2rem;
-}
+        // 渲染社群連結
+        const socialIcons = footer.querySelector('.social-icons');
+        if (socialIcons && footerData.socialLinks) {
+            const links = footerData.socialLinks;
+            socialIcons.innerHTML = `
+                ${links.line ? `<a href="${links.line}" target="_blank" rel="noopener noreferrer">
+                    <img src="https://raw.githubusercontent.com/vvstudiocode/korea/main/line.png" alt="Line">
+                </a>` : ''}
+                ${links.instagram ? `<a href="${links.instagram}" target="_blank" rel="noopener noreferrer">
+                    <img src="https://raw.githubusercontent.com/vvstudiocode/korea/main/instagram.png" alt="Instagram">
+                </a>` : ''}
+                ${links.threads ? `<a href="${links.threads}" target="_blank" rel="noopener noreferrer">
+                    <img src="https://raw.githubusercontent.com/vvstudiocode/korea/main/threads.png" alt="Threads">
+                </a>` : ''}
+            `;
+        }
 
-.section-header h2 {
-    font-family: 'Playfair Display', serif;
-    font-size: 2rem;
-    margin: 0;
-}
+        // 渲染版權聲明
+        const copyright = footer.querySelector('.footer-copyright');
+        if (copyright && footerData.copyright) {
+            // 保留社群連結 div，只更新文字
+            const socialDiv = copyright.querySelector('.social-icons');
+            const socialHTML = socialDiv ? socialDiv.outerHTML : '';
+            copyright.innerHTML = socialHTML + '\n' + footerData.copyright;
+        }
+    },
 
-.view-all {
-    color: var(--text-sub);
-    text-decoration: none;
-    font-size: 0.9rem;
-}
+    templateAnnouncement: function (comp) {
+        const bgStyle = comp.bgTransparent ? 'background: transparent; border-bottom:1px solid #eee;' : `background-color: ${comp.bgColor || '#f3f4f6'};`;
+        return `
+            <div class="announcement-bar" style="${bgStyle} text-align: ${comp.textAlign || 'center'}">
+                <div class="announcement-content">
+                    ✨ ${comp.text || '歡迎光臨 OMO Select！'} ✨
+                </div>
+            </div>
+        `;
+    },
 
-.view-all:hover {
-    color: var(--accent);
-}
+    templateHero: function (comp) {
+        const align = comp.textAlign || 'center';
+        const alignItems = align === 'left' ? 'flex-start' : (align === 'right' ? 'flex-end' : 'center');
+        return `
+            <div class="hero-banner" style="background-image: linear-gradient(to bottom, rgba(0,0,0,0.2), rgba(0,0,0,0.4)), url('${comp.image}')">
+                <div class="hero-content" style="text-align: ${align}; align-items: ${alignItems}">
+                    <h1>${comp.title || ''}</h1>
+                    <p>${comp.subtitle || ''}</p>
+                    ${comp.buttonText ? `<a href="${comp.buttonLink || '#'}" class="cta-button">${comp.buttonText}</a>` : ''}
+                </div>
+            </div>
+        `;
+    },
 
-/* Info Section (Grid) */
-.info-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4rem;
-    align-items: center;
-}
+    templateCategories: function (comp) {
+        // 抓取現有分類 (假設全域有 categories 或從商店資料拿)
+        const categories = ['全部', '美妝保養', '流行服飾', '生活用品', '零食食品'];
+        const items = categories.map(cat => `
+            <div class="category-pill" onclick="filterByCategory('${cat}')">
+                <span>${cat}</span>
+            </div>
+        `).join('');
 
-.info-image img {
-    width: 100%;
-    border-radius: 20px;
-    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.12);
-    /* 提升陰影質感 */
-    transition: transform 0.5s ease;
-}
+        return `
+            <div class="section-container">
+                ${comp.title ? `<div class="section-header" style="text-align:${comp.textAlign || 'left'}"><h2>${comp.title}</h2></div>` : ''}
+                <div class="category-scroll">
+                    ${items}
+                </div>
+            </div>
+        `;
+    },
 
-.info-image:hover img {
-    transform: scale(1.02);
-}
+    templateProductList: function (comp) {
+        return `
+            <div class="section-container">
+                <div class="section-header" style="text-align:${comp.textAlign || 'left'}; justify-content:${comp.textAlign === 'center' ? 'center' : (comp.textAlign === 'right' ? 'flex-end' : 'space-between')}">
+                    <h2>${comp.title || '輪播圖'}</h2>
+                    <a href="#" class="view-all">查看全部 →</a>
+                </div>
+                <div class="products-grid" id="grid-${Math.random().toString(36).substr(2, 9)}">
+                    <div class="loading-spinner">載入中...</div>
+                </div>
+            </div>
+        `;
+    },
 
-.info-text h3 {
-    font-family: 'Playfair Display', serif;
-    font-size: 2.5rem;
-    margin-bottom: 1.5rem;
-}
+    templateInfoSection: function (comp) {
+        return `
+            <div class="section-container">
+                <div class="info-grid">
+                    <div class="info-image">
+                        <img src="${comp.image}" alt="info">
+                    </div>
+                    <div class="info-text" style="text-align: ${comp.textAlign || 'left'}">
+                        <h3>${comp.title || ''}</h3>
+                        <p>${comp.subtitle || ''}</p>
+                        ${comp.buttonText ? `<a href="${comp.buttonLink || '#'}" class="text-link">${comp.buttonText}</a>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    },
 
-.info-text p {
-    line-height: 1.8;
-    color: var(--text-sub);
-    margin-bottom: 2rem;
-}
+    renderProducts: async function (section, comp) {
+        // 決定是否使用輪播（products 類型用輪播，product_list 用 grid）
+        const useCarousel = comp.type === 'products';
 
-.text-link {
-    color: var(--text-main);
-    text-decoration: underline;
-    font-weight: 600;
-}
+        section.innerHTML = `
+            <div class="section-container">
+                ${comp.title ? `<h2 class="section-title">${comp.title}</h2>` : ''}
+                ${useCarousel ? `
+                    <div class="products-carousel-wrapper">
+                        <button class="carousel-nav prev" onclick="PageRenderer.scrollCarousel(this, -1)">‹</button>
+                        <div class="products-carousel">
+                            <div class="loading">載入商品中...</div>
+                        </div>
+                        <button class="carousel-nav next" onclick="PageRenderer.scrollCarousel(this, 1)">›</button>
+                    </div>
+                ` : `
+                    <div class="products-grid">
+                        <div class="loading">載入商品中...</div>
+                    </div>
+                `}
+            </div>
+        `;
 
-.text-link:hover {
-    color: var(--accent);
-}
+        const container = useCarousel
+            ? section.querySelector('.products-carousel')
+            : section.querySelector('.products-grid');
+        if (!container) return;
 
-/* Products Grid & Cards */
-/* Products Grid & Cards */
-.products-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 3rem;
-    margin-top: 2rem;
-}
+        try {
+            // 兼容性處理：在後台使用 currentProducts，在前端使用 products
+            let allProducts = typeof products !== 'undefined' ? products : (typeof currentProducts !== 'undefined' ? currentProducts : []);
 
-.product-card {
-    background: transparent;
-    border-radius: 0;
-    overflow: hidden;
-    transition: transform 0.4s ease;
-    cursor: pointer;
-    text-align: center;
-    border: none;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
+            // 確保資料已加載
+            if (allProducts.length === 0) {
+                if (typeof loadProducts === 'function') {
+                    await loadProducts();
+                    allProducts = products;
+                } else if (typeof fetchProducts === 'function') {
+                    await fetchProducts(); // 管理後台的函數
+                    allProducts = typeof currentProducts !== 'undefined' ? currentProducts : [];
+                }
+            }
 
-.product-card:hover {
-    transform: translateY(-5px);
-}
+            let filtered = [];
 
-.product-image {
-    width: 100%;
-    aspect-ratio: 1/1;
-    overflow: hidden;
-    border-radius: 12px;
-    background: #f0f0f0;
-    margin-bottom: 1.5rem;
-}
+            // 根據來源類型篩選商品
+            if (comp.sourceType === 'manual' && comp.productIds && comp.productIds.length > 0) {
+                // 手動選擇：依照 ID 列表順序找出商品
+                comp.productIds.forEach(pid => {
+                    const found = allProducts.find(p => String(p.id) === String(pid));
+                    if (found) filtered.push(found);
+                });
+            } else {
+                // 分類篩選 (預設)
+                filtered = allProducts;
+                if (comp.category && comp.category !== '全部') {
+                    filtered = allProducts.filter(p => p.category === comp.category);
+                }
+                // 只有自動篩選才需要限制數量，手動選擇則顯示全部已選
+                const limit = parseInt(comp.limit) || 4;
+                filtered = filtered.slice(0, limit);
+            }
 
-.product-image img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
+            container.innerHTML = '';
+            if (filtered.length === 0) {
+                const msg = comp.sourceType === 'manual' ? '尚未選擇展示商品' : '此分類暫無商品';
+                container.innerHTML = `<div class="empty-msg">${msg}</div>`;
+                return;
+            }
 
-.product-info {
-    padding: 0;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
+            filtered.forEach(p => {
+                // 確保 p.id 存在且 p.image 是字串
+                if (!p.id) p.id = 'PID-' + Math.random().toString(36).substr(2, 5);
+                const card = this.createFallbackProductCard(p);
+                container.appendChild(card);
+            });
 
-.product-name {
-    font-size: 1.1rem;
-    font-weight: 500;
-    margin-bottom: 0.8rem;
-    color: #333;
-    line-height: 1.4;
-    text-align: center;
-    /* 統一標題高度，最多顯示兩行 */
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    line-clamp: 2;
-    /* Standard property for future compatibility */
-    overflow: hidden;
-    height: 2.8em;
-    width: 100%;
-}
+            // 為輪播添加觸控滑動支援
+            if (useCarousel) {
+                this.initCarouselTouch(container);
+            }
+        } catch (err) {
+            console.error('Failed to load products for section:', err);
+            container.innerHTML = '<div class="error-msg">載入失敗</div>';
+        }
+    },
 
-.product-price {
-    font-size: 1.1rem;
-    font-weight: 500;
-    color: #333;
-    margin-bottom: 1.2rem;
-}
+    // 輪播滑動功能
+    scrollCarousel: function (btn, direction) {
+        const wrapper = btn.closest('.products-carousel-wrapper');
+        const carousel = wrapper.querySelector('.products-carousel');
+        const scrollAmount = 300; // 每次滾動的距離
+        carousel.scrollBy({ left: direction * scrollAmount, behavior: 'smooth' });
+    },
 
-.product-btn {
-    width: 100%;
-    padding: 0.8rem;
-    background: #D68C94;
-    /* 玫瑰粉色 */
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-size: 0.9rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
+    // 觸控滑動支援
+    initCarouselTouch: function (carousel) {
+        let isDown = false;
+        let startX;
+        let scrollLeft;
 
-.product-btn:hover {
-    background: #c88289;
-    transform: translateY(-2px);
-}
+        carousel.addEventListener('mousedown', (e) => {
+            isDown = true;
+            carousel.style.cursor = 'grabbing';
+            startX = e.pageX - carousel.offsetLeft;
+            scrollLeft = carousel.scrollLeft;
+        });
 
-.loading-spinner,
-.empty-msg {
-    grid-column: 1 / -1;
-    padding: 3rem;
-    text-align: center;
-    color: var(--text-sub);
-}
+        carousel.addEventListener('mouseleave', () => {
+            isDown = false;
+            carousel.style.cursor = 'grab';
+        });
 
-/* Animations */
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(30px);
+        carousel.addEventListener('mouseup', () => {
+            isDown = false;
+            carousel.style.cursor = 'grab';
+        });
+
+        carousel.addEventListener('mousemove', (e) => {
+            if (!isDown) return;
+            e.preventDefault();
+            const x = e.pageX - carousel.offsetLeft;
+            const walk = (x - startX) * 2;
+            carousel.scrollLeft = scrollLeft - walk;
+        });
+    },
+
+    createFallbackProductCard: function (p) {
+        const card = document.createElement('div');
+        card.className = 'product-card system-card';
+        card.style.cssText = 'display:block; width:100%; text-align:center; cursor:pointer; background:transparent;';
+        card.setAttribute('data-id', p.id);
+        card.onclick = () => { if (typeof showProductDetail === 'function') showProductDetail(p.id); };
+
+        // 圖片網址處理
+        let imageUrl = 'https://via.placeholder.com/400?text=No+Image';
+        const rawImg = p.image || p.prodImage || p.img || '';
+        const imgStr = String(rawImg).trim();
+        if (imgStr && imgStr !== '' && imgStr !== 'undefined' && imgStr !== 'null') {
+            imageUrl = imgStr.split(',')[0].trim();
+        }
+
+        const hasOptions = p.options && (typeof p.options === 'string' ? p.options !== '{}' : Object.keys(p.options).length > 0);
+        const btnText = hasOptions ? '選擇規格' : '加入購物車';
+
+        // 使用 DOM 建立元素避免 HTML 跳脫問題
+        const imgBox = document.createElement('div');
+        imgBox.className = 'card-img-box';
+        imgBox.style.cssText = 'width:100%; aspect-ratio:1/1; background:#f5f5f5; border-radius:12px; overflow:hidden; margin-bottom:15px; position:relative;';
+
+        const img = document.createElement('img');
+        img.src = imageUrl;
+        img.alt = p.name || '';
+        img.loading = 'lazy';
+        img.style.cssText = 'width:100%; height:100%; object-fit:cover; display:block;';
+        img.onerror = function () {
+            this.style.display = 'none';
+            this.parentElement.innerHTML = '<div style="padding:80px 10px; color:#999;">⚠️ 圖片載入失敗</div>';
+        };
+        imgBox.appendChild(img);
+
+        const infoBox = document.createElement('div');
+        infoBox.className = 'card-info-box';
+        infoBox.style.cssText = 'padding:0; width:100%;';
+
+        const title = document.createElement('h3');
+        title.style.cssText = 'font-size:1.1rem; font-weight:500; margin-bottom:8px; height:2.8em; line-height:1.4; overflow:hidden; color:#333; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;';
+        title.textContent = p.name || '';
+
+        const price = document.createElement('div');
+        price.style.cssText = 'font-weight:700; font-size:1.1rem; margin-bottom:12px; color:#333;';
+        price.textContent = 'NT$ ' + (p.price || 0);
+
+        const btn = document.createElement('button');
+        btn.style.cssText = 'width:100%; padding:12px; background:#D68C94; color:white; border:none; border-radius:30px; cursor:pointer; font-weight:500; transition: background 0.3s;';
+        btn.textContent = btnText;
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            if (hasOptions) {
+                if (typeof showProductDetail === 'function') showProductDetail(p.id);
+            } else {
+                if (typeof addToCartById === 'function') addToCartById(p.id);
+            }
+        };
+
+        infoBox.appendChild(title);
+        infoBox.appendChild(price);
+        infoBox.appendChild(btn);
+
+        card.appendChild(imgBox);
+        card.appendChild(infoBox);
+
+        return card;
     }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Mobile Adjustments for Preview */
-@media (max-width: 768px) {
-    .hero-content h1 {
-        font-size: 2.5rem;
-    }
-
-    .info-grid {
-        grid-template-columns: 1fr;
-        gap: 2rem;
-    }
-
-    .info-text h3 {
-        font-size: 2rem;
-    }
-
-    /* 手機版商品兩個一排 */
-    .products-grid {
-        grid-template-columns: repeat(2, 1fr) !important;
-        gap: 1rem;
-    }
-
-    .product-card .card-img-box,
-    .product-image {
-        min-height: 140px;
-    }
-
-    .product-name,
-    .product-card h3 {
-        font-size: 0.9rem;
-        height: auto;
-        -webkit-line-clamp: 2;
-    }
-
-    .product-price,
-    .product-card div[style*="font-weight:700"] {
-        font-size: 0.95rem;
-    }
-
-    .product-btn,
-    .product-card button {
-        padding: 10px;
-        font-size: 0.8rem;
-    }
-}
-
-/* 輪播圖樣式 - 精選商品 */
-.products-carousel-wrapper {
-    position: relative;
-    overflow: hidden;
-}
-
-.products-carousel {
-    display: flex;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    gap: 1.5rem;
-    padding: 1rem 0;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-    scroll-behavior: smooth;
-}
-
-.products-carousel::-webkit-scrollbar {
-    display: none;
-}
-
-.products-carousel .product-card {
-    flex: 0 0 280px;
-    scroll-snap-align: start;
-}
-
-/* 輪播導航按鈕 */
-.carousel-nav {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 40px;
-    height: 40px;
-    background: rgba(255, 255, 255, 0.95);
-    border: 1px solid #eee;
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
-    color: #333;
-    z-index: 10;
-    transition: all 0.3s;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.carousel-nav:hover {
-    background: var(--accent);
-    color: white;
-    border-color: var(--accent);
-}
-
-.carousel-nav.prev {
-    left: 0;
-}
-
-.carousel-nav.next {
-    right: 0;
-}
-
-@media (max-width: 768px) {
-    .products-carousel .product-card {
-        flex: 0 0 160px;
-    }
-
-    .carousel-nav {
-        width: 32px;
-        height: 32px;
-        font-size: 1rem;
-    }
-}
+};
