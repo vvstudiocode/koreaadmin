@@ -5,6 +5,108 @@
  * - Anti-Flash (Debounced Input)
  * - Component Spacing Controls
  */
+// 產品選擇彈窗元件
+const ProductSelectorModal = {
+    callback: null,
+    selectedIds: [],
+
+    init: function () {
+        if (document.getElementById('product-selector-modal')) return;
+
+        const modal = document.createElement('div');
+        modal.id = 'product-selector-modal';
+        modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; display:none; align-items:center; justify-content:center;';
+
+        modal.innerHTML = `
+            <div style="background:white; width:90%; max-width:600px; max-height:80vh; border-radius:12px; display:flex; flex-direction:column; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+                <div style="padding:15px 20px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                    <h3 style="margin:0; font-size:18px;">選擇商品</h3>
+                    <button id="psm-close" style="background:none; border:none; font-size:20px; cursor:pointer;">&times;</button>
+                </div>
+                <div style="padding:15px; border-bottom:1px solid #eee;">
+                    <input type="text" id="psm-search" placeholder="搜尋商品名稱..." style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; font-size:14px;">
+                </div>
+                <div id="psm-list" style="flex:1; overflow-y:auto; padding:0;">
+                    <!-- 商品列表 -->
+                </div>
+                <div style="padding:15px 20px; border-top:1px solid #eee; text-align:right; background:#fafafa; border-radius:0 0 12px 12px;">
+                    <button id="psm-cancel" style="padding:8px 20px; border:1px solid #ddd; background:white; border-radius:6px; margin-right:10px; cursor:pointer;">取消</button>
+                    <button id="psm-confirm" style="padding:8px 20px; border:none; background:#333; color:white; border-radius:6px; cursor:pointer;">確認選擇</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        document.getElementById('psm-close').onclick = () => this.close();
+        document.getElementById('psm-cancel').onclick = () => this.close();
+        document.getElementById('psm-confirm').onclick = () => this.confirm();
+
+        document.getElementById('psm-search').addEventListener('input', (e) => this.renderList(e.target.value));
+    },
+
+    open: function (currentIds, callback) {
+        this.init();
+        this.selectedIds = [...(currentIds || [])]; // 複製一份
+        this.callback = callback;
+
+        const modal = document.getElementById('product-selector-modal');
+        modal.style.display = 'flex';
+        document.getElementById('psm-search').value = '';
+        this.renderList();
+    },
+
+    close: function () {
+        document.getElementById('product-selector-modal').style.display = 'none';
+        this.callback = null;
+    },
+
+    confirm: function () {
+        if (this.callback) this.callback(this.selectedIds);
+        this.close();
+    },
+
+    toggleSelection: function (id) {
+        const idx = this.selectedIds.indexOf(String(id));
+        if (idx >= 0) {
+            this.selectedIds.splice(idx, 1);
+        } else {
+            this.selectedIds.push(String(id));
+        }
+        this.renderList(document.getElementById('psm-search').value);
+    },
+
+    renderList: function (filter = '') {
+        const container = document.getElementById('psm-list');
+        const allProducts = typeof products !== 'undefined' ? products : (typeof currentProducts !== 'undefined' ? currentProducts : []);
+
+        const filtered = allProducts.filter(p => p.name.toLowerCase().includes(filter.toLowerCase()));
+
+        if (filtered.length === 0) {
+            container.innerHTML = '<div style="padding:20px; text-align:center; color:#999;">找不到任何商品</div>';
+            return;
+        }
+
+        container.innerHTML = filtered.map(p => {
+            const isSelected = this.selectedIds.includes(String(p.id));
+            const img = (p.image || '').split(',')[0];
+            return `
+                <div class="psm-item" onclick="ProductSelectorModal.toggleSelection('${p.id}')" 
+                     style="padding:10px 20px; border-bottom:1px solid #f5f5f5; display:flex; align-items:center; cursor:pointer; background:${isSelected ? '#f0f9ff' : 'white'};">
+                    <div style="width:20px; margin-right:10px; font-size:18px; color:${isSelected ? '#007bff' : '#ddd'};">
+                        ${isSelected ? '☑' : '☐'}
+                    </div>
+                    <img src="${img}" style="width:40px; height:40px; object-fit:cover; border-radius:4px; margin-right:15px; background:#eee;">
+                    <div style="flex:1;">
+                        <div style="font-weight:500; font-size:14px;">${p.name}</div>
+                        <div style="color:#888; font-size:12px;">$${p.price}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+};
+
 const PageBuilder = {
     layout: [],
     footer: null,
@@ -186,6 +288,11 @@ const PageBuilder = {
         this.addInnerField(container, '上方間距 (px)', 'marginTop', comp.marginTop || 0, 'range');
         this.addInnerField(container, '下方間距 (px)', 'marginBottom', comp.marginBottom || 0, 'range');
 
+        // 通用: 文字對齊
+        if (['hero', 'info_section', 'announcement', 'products', 'product_list'].includes(comp.type)) {
+            this.addInnerField(container, '文字對齊', 'textAlign', comp.textAlign || 'center', 'select', ['left', 'center', 'right']);
+        }
+
         // 分隔線
         const hr = document.createElement('hr');
         hr.style.cssText = 'margin: 15px 0; border: none; border-top: 1px solid #eee;';
@@ -218,11 +325,10 @@ const PageBuilder = {
 
                 select.onchange = (e) => {
                     this.layout[index].sourceType = e.target.value;
-                    // 初始化 productIds 陣列
                     if (e.target.value === 'manual' && !this.layout[index].productIds) {
                         this.layout[index].productIds = [];
                     }
-                    this.renderInlineForm(container, this.layout[index], index); // 重新渲染表單
+                    this.renderInlineForm(container, this.layout[index], index);
                     this.updatePreview();
                 };
 
@@ -233,7 +339,7 @@ const PageBuilder = {
             const sourceType = comp.sourceType || 'category';
 
             if (sourceType === 'category' || !isProducts) {
-                // 分類選擇 (原有邏輯)
+                // 分類選擇
                 const catWrapper = document.createElement('div');
                 catWrapper.style.marginBottom = '15px';
                 catWrapper.innerHTML = '<label style="display:block;margin-bottom:5px;font-size:14px;color:#555;">選擇分類</label>';
@@ -241,7 +347,6 @@ const PageBuilder = {
                 const catSelect = document.createElement('select');
                 catSelect.style.cssText = 'width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;';
 
-                // 獲取所有分類
                 const allProducts = typeof products !== 'undefined' ? products : (typeof currentProducts !== 'undefined' ? currentProducts : []);
                 const categories = ['全部', ...new Set(allProducts.map(p => p.category).filter(Boolean))];
 
@@ -257,120 +362,93 @@ const PageBuilder = {
                 catWrapper.appendChild(catSelect);
                 container.appendChild(catWrapper);
 
-                // 顯示數量限制
                 this.addInnerField(container, '顯示數量', 'limit', comp.limit || 4, 'number');
             } else {
-                // 手動選擇介面
+                // 手動選擇 (Modal)
                 const manualWrapper = document.createElement('div');
                 manualWrapper.style.marginBottom = '15px';
-                manualWrapper.style.padding = '10px';
+                manualWrapper.style.padding = '15px';
                 manualWrapper.style.background = '#f9f9f9';
                 manualWrapper.style.borderRadius = '8px';
-
-                // 1. 搜尋/新增商品
-                const searchInput = document.createElement('input');
-                searchInput.placeholder = '搜尋商品名稱...';
-                searchInput.style.cssText = 'width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; margin-bottom:10px;';
-
-                // 建立搜尋結果選單
-                const resultList = document.createElement('div');
-                resultList.style.cssText = 'max-height:150px; overflow-y:auto; border:1px solid #eee; background:white; display:none; margin-bottom:10px; border-radius:4px; position:absolute; width: 90%; z-index: 10; padding:5px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);';
-
-                // 相對定位容器以便放置下拉選單
-                const relativeBox = document.createElement('div');
-                relativeBox.style.position = 'relative';
-                relativeBox.appendChild(searchInput);
-                relativeBox.appendChild(resultList);
-                manualWrapper.appendChild(relativeBox);
+                manualWrapper.style.border = '1px solid #eee';
 
                 const allProducts = typeof products !== 'undefined' ? products : (typeof currentProducts !== 'undefined' ? currentProducts : []);
+                const selectedCount = (comp.productIds || []).length;
 
-                searchInput.oninput = (e) => {
-                    const term = e.target.value.toLowerCase();
-                    if (!term) {
-                        resultList.style.display = 'none';
-                        return;
-                    }
+                manualWrapper.innerHTML = `
+                    <div style="font-size:13px; color:#555; margin-bottom:10px;">目前已選擇 ${selectedCount} 項商品</div>
+                    <button class="btn-select-products" style="width:100%; padding:10px; background:white; border:1px dashed #999; border-radius:6px; cursor:pointer; color:#555;">
+                        + 選擇商品 (開啟視窗)
+                    </button>
+                    <div class="selected-items-preview" style="margin-top:10px; max-height:200px; overflow-y:auto;"></div>
+                `;
 
-                    const matches = allProducts.filter(p =>
-                        p.name.toLowerCase().includes(term) &&
-                        !comp.productIds?.includes(p.id) // 排除已選的
-                    );
-
-                    if (matches.length > 0) {
-                        resultList.innerHTML = matches.map(p => {
-                            const img = (p.image || '').split(',')[0];
-                            return `
-                            <div class="search-item" style="padding:8px; cursor:pointer; border-bottom:1px solid #f0f0f0; display:flex; align-items:center; gap:8px;" data-id="${p.id}">
-                                <img src="${img}" style="width:30px;height:30px;object-fit:cover;border-radius:4px; background:#eee;">
-                                <div style="font-size:13px; flex:1;">
-                                    <div style="font-weight:bold;">${p.name}</div>
-                                    <div style="font-size:12px; color:#888;">$${p.price}</div>
-                                </div>
-                            </div>
-                        `}).join('');
-                        resultList.style.display = 'block';
-
-                        // 綁定點擊事件
-                        resultList.querySelectorAll('.search-item').forEach(item => {
-                            item.onclick = () => {
-                                if (!this.layout[index].productIds) this.layout[index].productIds = [];
-                                this.layout[index].productIds.push(item.dataset.id);
-                                searchInput.value = '';
-                                resultList.style.display = 'none';
-                                this.renderInlineForm(container, this.layout[index], index); // 重繪以更新列表
+                setTimeout(() => {
+                    const btn = manualWrapper.querySelector('.btn-select-products');
+                    if (btn) {
+                        btn.onclick = () => {
+                            ProductSelectorModal.open(comp.productIds, (newIds) => {
+                                this.layout[index].productIds = newIds;
+                                this.renderInlineForm(container, this.layout[index], index);
                                 this.updatePreview();
-                            };
-                        });
-                    } else {
-                        resultList.innerHTML = '<div style="padding:8px; color:#999; font-size:13px;">找不到商品</div>';
-                        resultList.style.display = 'block';
+                            });
+                        };
                     }
-                };
+                }, 0);
 
-                // 點擊外部關閉搜尋結果 (簡單版：點擊 input 才顯示)
-                searchInput.onfocus = () => { if (searchInput.value) resultList.style.display = 'block'; };
-
-                // 2. 已選商品列表
-                manualWrapper.innerHTML += '<label style="display:block;margin-bottom:5px;font-size:13px;color:#555; margin-top:10px;">已選商品</label>';
-                const selectedList = document.createElement('div');
-
-                if (comp.productIds && comp.productIds.length > 0) {
+                const previewContainer = manualWrapper.querySelector('.selected-items-preview');
+                if (selectedCount > 0) {
                     comp.productIds.forEach((pid, pidIdx) => {
                         const product = allProducts.find(p => String(p.id) === String(pid));
                         if (product) {
                             const item = document.createElement('div');
-                            item.style.cssText = 'display:flex; align-items:center; gap:10px; background:white; padding:8px; border:1px solid #eee; margin-bottom:5px; border-radius:4px; user-select:none;';
+                            item.style.cssText = 'display:flex; align-items:center; gap:10px; background:white; padding:8px; border:1px solid #eee; margin-bottom:5px; border-radius:4px;';
                             item.innerHTML = `
-                                <span style="color:#ccc; cursor:move;">☰</span>
-                                <img src="${(product.image || '').split(',')[0]}" style="width:40px;height:40px;object-fit:cover;border-radius:4px; background:#eee;">
+                                <img src="${(product.image || '').split(',')[0]}" style="width:30px;height:30px;object-fit:cover;border-radius:4px; background:#eee;">
                                 <div style="flex:1; overflow:hidden;">
-                                    <div style="font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${product.name}</div>
-                                    <div style="font-size:12px; color:#888;">$${product.price}</div>
+                                    <div style="font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${product.name}</div>
                                 </div>
-                                <button style="background:none; border:none; color:#ff4d4f; cursor:pointer; font-size:18px;">×</button>
+                                <button style="background:none; border:none; color:#999; cursor:pointer; font-size:16px;">×</button>
                             `;
-
-                            // 移除按鈕
                             item.querySelector('button').onclick = () => {
                                 this.layout[index].productIds.splice(pidIdx, 1);
                                 this.renderInlineForm(container, this.layout[index], index);
                                 this.updatePreview();
                             };
-
-                            selectedList.appendChild(item);
+                            previewContainer.appendChild(item);
                         }
                     });
-                } else {
-                    selectedList.innerHTML = '<div style="text-align:center; padding:10px; color:#aaa; font-size:13px;">尚未選擇商品</div>';
                 }
 
-                manualWrapper.appendChild(selectedList);
                 container.appendChild(manualWrapper);
             }
         } else if (comp.type === 'announcement') {
             this.addInnerField(container, '公告內容', 'text', comp.text);
-            this.addInnerField(container, '背景顏色', 'bgColor', comp.bgColor || '#f3f4f6', 'color');
+
+            // 背景透明選項
+            const bgWrapper = document.createElement('div');
+            bgWrapper.className = 'form-group';
+            bgWrapper.style.marginBottom = '12px';
+            const transparent = comp.bgTransparent === true;
+
+            bgWrapper.innerHTML = `
+                <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+                    <input type="checkbox" ${transparent ? 'checked' : ''}>
+                    背景透明
+                </label>
+            `;
+
+            bgWrapper.querySelector('input').onchange = (e) => {
+                this.layout[index].bgTransparent = e.target.checked;
+                this.renderInlineForm(container, this.layout[index], index);
+                this.updatePreview();
+            };
+            container.appendChild(bgWrapper);
+
+            if (!transparent) {
+                this.addInnerField(container, '背景顏色', 'bgColor', comp.bgColor || '#f3f4f6', 'color');
+            }
+
         } else if (comp.type === 'categories') {
             this.addInnerField(container, '區塊標題', 'title', comp.title);
             // 分類導覽目前是自動抓取的，不需要編輯具體分類
