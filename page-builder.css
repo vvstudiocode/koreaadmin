@@ -355,3 +355,39 @@
     display: block;
     margin-bottom: 0.5rem;
 }
+
+/* Preview Container 使用 Flexbox 確保頁尾在底部 */
+.preview-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.preview-footer {
+    margin-top: auto !important;
+    flex-shrink: 0;
+}
+
+/* 手機預覽模式商品兩個一排 */
+.preview-container.mobile .products-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.75rem !important;
+}
+
+.preview-container.mobile .product-card {
+    font-size: 0.85rem;
+}
+
+.preview-container.mobile .card-img-box {
+    min-height: 120px !important;
+}
+
+.preview-container.mobile .product-card h3 {
+    font-size: 0.85rem !important;
+    height: auto !important;
+    -webkit-line-clamp: 2;
+}
+
+.preview-container.mobile .product-card button {
+    padding: 8px !important;
+    font-size: 0.75rem !important;
+}
