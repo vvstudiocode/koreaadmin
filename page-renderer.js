@@ -241,10 +241,10 @@ const PageRenderer = {
         }
 
         // 偵錯日誌
-        if (typeof PageRenderer._debugDone === 'undefined') {
-            console.log('[PageRenderer Debug] 第一件商品圖片原始資料:', rawImg);
-            console.log('[PageRenderer Debug] 解析出的圖片網址:', imageUrl);
-            PageRenderer._debugDone = true;
+        if (typeof PageRenderer._debugCount === 'undefined') PageRenderer._debugCount = 0;
+        PageRenderer._debugCount++;
+        if (PageRenderer._debugCount <= 5) {
+            console.log(`[PageRenderer Debug ${PageRenderer._debugCount}] 商品: ${p.name}, 網址: ${imageUrl}`);
         }
 
         const hasOptions = p.options && (typeof p.options === 'string' ? p.options !== '{}' : Object.keys(p.options).length > 0);
@@ -255,15 +255,19 @@ const PageRenderer = {
             ? `showProductDetail('${p.id}')`
             : `addToCartById('${p.id}')`;
 
+        // 使用 padding-top 的方式強制撐出高度，防止 aspect-ratio 不相容
         card.innerHTML = `
-            <div class="product-image" style="width:100%; aspect-ratio:1/1; background:#f5f5f5; border-radius:12px; overflow:hidden; margin-bottom:15px;">
-                <img src="${imageUrl}" alt="${p.name}" loading="lazy" 
-                     style="width:100%; height:100%; object-fit:cover; display:block;"
-                     onerror="this.onerror=null; this.src='https://via.placeholder.com/400?text=Image+Error';">
+            <div class="product-image" style="width:100%; position:relative; background:#f0f0f0; border-radius:12px; overflow:hidden; margin-bottom:15px; height:0; padding-top:100%;">
+                <div style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:10px; color:#ccc;">
+                    <img src="${imageUrl}" alt="${p.name}" loading="lazy" 
+                         style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:2;"
+                         onerror="this.style.display='none'; this.parentElement.querySelector('span').innerHTML='⚠️ 無法載入';">
+                    <span style="z-index:1;">載入中...</span>
+                </div>
             </div>
             <div class="product-info">
-                <h3 class="product-name" style="font-size:1.1rem; font-weight:500; margin-bottom:8px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; height:2.8em; line-height:1.4;">${p.name}</h3>
-                <div class="product-price" style="font-weight:600; font-size:1.1rem; margin-bottom:12px;">NT$ ${p.price || 0}</div>
+                <h3 class="product-name" style="font-size:1.1rem; font-weight:500; margin-bottom:8px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; height:2.8em; line-height:1.4; text-align:center;">${p.name}</h3>
+                <div class="product-price" style="font-weight:600; font-size:1.1rem; margin-bottom:12px; text-align:center;">NT$ ${p.price || 0}</div>
                 <button class="product-btn" onclick="event.stopPropagation(); ${btnAction}" style="width:100%; padding:10px; background:#D68C94; color:white; border:none; border-radius:30px; cursor:pointer;">${btnText}</button>
             </div>
         `;
