@@ -97,6 +97,8 @@ body {
     color: var(--white);
     display: flex;
     flex-direction: column;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
 }
 
 .sidebar-header {
@@ -127,6 +129,7 @@ body {
 .sidebar-footer {
     padding: 1.5rem;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
 }
 
 .sidebar-footer button {
@@ -150,6 +153,7 @@ body {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .top-bar {
@@ -1440,4 +1444,35 @@ body.sidebar-open {
 
 .spec-group-row .remove-btn:hover {
     background: #ff6b81;
+}
+/* Collapsed Sidebar State (Desktop) */
+@media (min-width: 1025px) {
+    .dashboard-container.sidebar-collapsed .sidebar {
+        width: 70px;
+    }
+
+    .dashboard-container.sidebar-collapsed .sidebar-header h3,
+    .dashboard-container.sidebar-collapsed .nav-links li span:not(.icon) {
+        display: none;
+    }
+    
+    .dashboard-container.sidebar-collapsed .nav-links li {
+        text-align: center;
+        padding: 1rem 0;
+        justify-content: center;
+        border-left-width: 0;
+        border-bottom: 4px solid transparent;
+        display: flex;
+        align-items: center;
+    }
+    
+    .dashboard-container.sidebar-collapsed .nav-links li.active {
+        border-bottom: 4px solid var(--accent);
+        background: rgba(255, 255, 255, 0.1);
+    }
+    
+    .dashboard-container.sidebar-collapsed .sidebar-footer button {
+        padding: 8px 0;
+        font-size: 0.8rem;
+    }
 }
