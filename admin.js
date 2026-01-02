@@ -1310,6 +1310,51 @@ function toggleSidebar() {
     }
 }
 
+// 桌面版側邊欄縮合專用函數
+function toggleDesktopSidebar() {
+    const dashboard = document.getElementById('dashboardPage');
+    if (!dashboard) return;
+
+    // 只在桌面版生效
+    if (window.innerWidth <= 1024) return;
+
+    dashboard.classList.toggle('sidebar-collapsed');
+
+    // 保存縮合狀態到 localStorage
+    const isCollapsed = dashboard.classList.contains('sidebar-collapsed');
+    localStorage.setItem('sidebar_collapsed', isCollapsed ? 'true' : 'false');
+
+    // 更新按鈕圖示
+    const collapseBtn = document.querySelector('.sidebar-collapse-btn');
+    if (collapseBtn) {
+        collapseBtn.innerHTML = isCollapsed ? '⟩' : '⟨';
+        collapseBtn.title = isCollapsed ? '展開選單' : '收合選單';
+    }
+
+    // 動畫結束後通知 PageBuilder 更新比例
+    setTimeout(() => {
+        if (typeof PageBuilder !== 'undefined' && PageBuilder.updatePreviewScale) {
+            PageBuilder.updatePreviewScale();
+        }
+    }, 310);
+}
+
+// 初始化時恢復側邊欄縮合狀態
+document.addEventListener('DOMContentLoaded', () => {
+    const savedCollapsed = localStorage.getItem('sidebar_collapsed');
+    if (savedCollapsed === 'true' && window.innerWidth > 1024) {
+        const dashboard = document.getElementById('dashboardPage');
+        if (dashboard) {
+            dashboard.classList.add('sidebar-collapsed');
+            const collapseBtn = document.querySelector('.sidebar-collapse-btn');
+            if (collapseBtn) {
+                collapseBtn.innerHTML = '⟩';
+                collapseBtn.title = '展開選單';
+            }
+        }
+    }
+});
+
 // ----------------------
 // 刪除操作
 // ----------------------
