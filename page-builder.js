@@ -356,14 +356,14 @@ const PageBuilder = {
 
     getComponentTypeInfo: function (type) {
         const types = {
-            'hero': { name: '首頁大圖', icon: '🖼️' },
-            'categories': { name: '分類導覽', icon: '🗄️' },
-            'products': { name: '精選商品區', icon: '🛍️' },
-            'product_list': { name: '商品列表', icon: '📋' },
-            'info_section': { name: '圖文介紹', icon: '📝' },
-            'announcement': { name: '公告欄', icon: '📢' }
+            'hero': { name: '首頁大圖', icon: '' },
+            'categories': { name: '分類導覽', icon: '' },
+            'products': { name: '輪播圖', icon: '' },
+            'product_list': { name: '商品列表', icon: '' },
+            'info_section': { name: '圖文介紹', icon: '' },
+            'announcement': { name: '公告欄', icon: '' }
         };
-        return types[type] || { name: '未定類別', icon: '📦' };
+        return types[type] || { name: '未定類別', icon: '' };
     },
 
     addComponent: function (type) {
@@ -373,7 +373,7 @@ const PageBuilder = {
             newComp.image = 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800';
             newComp.buttonText = '查看更多';
         } else if (type === 'product_list' || type === 'products') {
-            newComp.title = '精選推薦';
+            newComp.title = '輪播圖';
             newComp.category = '全部';
             newComp.limit = 4;
         } else if (type === 'announcement') {
