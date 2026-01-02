@@ -758,6 +758,12 @@ function openProductModal(productId = null) {
     // 嘗試從 pending 或 current 找
     let p = null;
 
+    // 重置圖片狀態
+    selectedImages = [];
+    existingImages = [];
+    document.getElementById('imagePreviewContainer').innerHTML = '';
+    document.getElementById('uploadImagesBtn').style.display = 'none';
+
     if (productId) {
         // 先找 pending
         p = pendingProductUpdates.find(x => String(x.id) === String(productId));
@@ -775,13 +781,25 @@ function openProductModal(productId = null) {
             document.getElementById('prodStock').value = p.stock;
             document.getElementById('prodStatus').value = p.status;
             document.getElementById('prodDesc').value = p.description;
-            // 處理圖片 Array 或 String
-            let imgVal = p.image;
-            if (Array.isArray(imgVal)) imgVal = imgVal.join(',');
-            document.getElementById('prodImage').value = imgVal || '';
 
-            document.getElementById('prodOptions').value = JSON.stringify(p.options || {});
+            // 處理現有圖片
+            let imgVal = p.image || '';
+            if (imgVal) {
+                existingImages = imgVal.split(',').filter(url => url.trim() !== '');
+                document.getElementById('prodImage').value = existingImages.join(',');
+            } else {
+                document.getElementById('prodImage').value = '';
+            }
+
+            // 渲染預覽 (包含現有圖片)
+            renderImagePreviews();
+
+            // 處理規格產生器
+            renderSpecBuilder(p.options || {});
         }
+    } else {
+        document.getElementById('prodImage').value = '';
+        renderSpecBuilder({});
     }
 
     openModal('productModal');
@@ -821,16 +839,7 @@ async function handleProductSubmit(e) {
         submitBtn.textContent = '儲存中...';
 
         const productId = document.getElementById('prodId').value;
-
-        let options = {};
-        const optionsStr = document.getElementById('prodOptions').value.trim();
-        if (optionsStr) {
-            try {
-                options = JSON.parse(optionsStr);
-            } catch (e) {
-                alert('規格 JSON 格式錯誤'); return;
-            }
-        }
+        const options = getSpecData();
 
         // 建立 Product 物件
         const isNew = !productId;
@@ -943,10 +952,9 @@ async function saveProductBatchChanges() {
                 }
 
                 // 更新圖片欄位
-                const currentUrls = item.image;
-                const allUrls = currentUrls
-                    ? currentUrls.split(',').concat(uploadedUrls).join(',')
-                    : uploadedUrls.join(',');
+                let currentUrls = item.image || '';
+                let existingArr = currentUrls.split(',').map(u => u.trim()).filter(u => u !== '');
+                const allUrls = [...existingArr, ...uploadedUrls].join(',');
 
                 item.image = allUrls;
                 delete item.newImages; // 清除暫存檔案
@@ -1020,6 +1028,7 @@ function closeModal(id) {
 // 圖片上傳到 GitHub
 // ----------------------
 let selectedImages = [];
+let existingImages = []; // 新增：存儲現有圖片網址
 
 function handleImageSelect(event) {
     const files = Array.from(event.target.files);
@@ -1053,14 +1062,26 @@ function renderImagePreviews() {
     const container = document.getElementById('imagePreviewContainer');
     container.innerHTML = '';
 
+    // 1. 渲染現有圖片 (從 existingImages 陣列)
+    existingImages.forEach((url, index) => {
+        const div = document.createElement('div');
+        div.className = 'image-preview-item existing';
+        div.innerHTML = `
+            <img src="${url}" alt="現有圖片">
+            <button type="button" class="remove-btn" onclick="removeExistingImage(${index})">×</button>
+        `;
+        container.appendChild(div);
+    });
+
+    // 2. 渲染新選擇的檔案 (從 selectedImages 陣列)
     selectedImages.forEach((file, index) => {
         const reader = new FileReader();
         reader.onload = (e) => {
             const div = document.createElement('div');
-            div.className = 'image-preview-item';
+            div.className = 'image-preview-item new';
             div.innerHTML = `
                 <img src="${e.target.result}" alt="預覽">
-                <button class="remove-btn" onclick="removeImage(${index})">×</button>
+                <button type="button" class="remove-btn" onclick="removeNewImage(${index})">×</button>
             `;
             container.appendChild(div);
         };
@@ -1068,7 +1089,15 @@ function renderImagePreviews() {
     });
 }
 
-function removeImage(index) {
+// 移除現有圖片
+function removeExistingImage(index) {
+    existingImages.splice(index, 1);
+    document.getElementById('prodImage').value = existingImages.join(',');
+    renderImagePreviews();
+}
+
+// 移除新選圖片
+function removeNewImage(index) {
     selectedImages.splice(index, 1);
     renderImagePreviews();
 
@@ -1119,15 +1148,11 @@ async function uploadImagesToGitHub() {
             }
         }
 
-        // 成功：填入圖片 URL
-        const currentUrls = document.getElementById('prodImage').value;
-        const allUrls = currentUrls
-            ? currentUrls.split(',').concat(uploadedUrls).join(',')
-            : uploadedUrls.join(',');
+        // 成功：合併 URL
+        existingImages = [...existingImages, ...uploadedUrls];
+        document.getElementById('prodImage').value = existingImages.join(',');
 
-        document.getElementById('prodImage').value = allUrls;
-
-        // 清空選擇
+        // 清空新選擇
         selectedImages = [];
         document.getElementById('imagePreviewContainer').innerHTML = '';
         document.getElementById('imageFileInput').value = '';
@@ -1883,4 +1908,57 @@ function exportPurchasingStats() {
     document.body.removeChild(link);
 
     showToast('匯出成功');
+}
+function renderSpecBuilder(options = {}) {
+    const container = document.getElementById('specBuilderContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    // options 可能格式: { "顏色": ["紅", "藍"] } 或 [ {name: "顏色", values: ["紅", "藍"]} ]
+    let normalizedOptions = [];
+    if (Array.isArray(options)) {
+        normalizedOptions = options;
+    } else if (typeof options === 'object' && options !== null) {
+        normalizedOptions = Object.entries(options).map(([name, values]) => ({
+            name: name,
+            values: Array.isArray(values) ? values : [values]
+        }));
+    }
+
+    if (normalizedOptions.length === 0) {
+        // 預設給一個空的列
+        addSpecGroup();
+    } else {
+        normalizedOptions.forEach(opt => {
+            addSpecGroup(opt.name, opt.values.join(','));
+        });
+    }
+}
+
+function addSpecGroup(name = '', values = '') {
+    const container = document.getElementById('specBuilderContainer');
+    const div = document.createElement('div');
+    div.className = 'spec-group-row';
+    div.innerHTML = `
+        <input type="text" placeholder="類別 (如：尺寸)" class="group-name" value="${name}">
+        <input type="text" placeholder="選項用逗號分開 (如：S,M,L)" class="group-values" value="${values}">
+        <button type="button" class="remove-btn" onclick="this.parentElement.remove()">✕</button>
+    `;
+    container.appendChild(div);
+}
+
+function getSpecData() {
+    const container = document.getElementById('specBuilderContainer');
+    const rows = container.querySelectorAll('.spec-group-row');
+    const result = {};
+
+    rows.forEach(row => {
+        const name = row.querySelector('.group-name').value.trim();
+        const values = row.querySelector('.group-values').value.trim();
+        if (name && values) {
+            result[name] = values.split(',').map(v => v.trim()).filter(v => v !== '');
+        }
+    });
+
+    return result;
 }
