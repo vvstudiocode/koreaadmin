@@ -1445,34 +1445,104 @@ body.sidebar-open {
 .spec-group-row .remove-btn:hover {
     background: #ff6b81;
 }
+
 /* Collapsed Sidebar State (Desktop) */
 @media (min-width: 1025px) {
+
+    /* 縮合按鈕樣式 */
+    .sidebar-collapse-btn {
+        display: flex;
+        position: absolute;
+        right: -14px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 28px;
+        height: 28px;
+        background: #333;
+        color: #fff;
+        border: 2px solid #555;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 14px;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        transition: all 0.3s;
+    }
+
+    .sidebar-collapse-btn:hover {
+        background: var(--accent);
+        border-color: var(--accent);
+    }
+
+    /* Nav Links Icon/Text 佈局 */
+    .nav-links li {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .nav-links li .icon {
+        font-size: 1.2rem;
+        flex-shrink: 0;
+        width: 24px;
+        text-align: center;
+    }
+
+    .nav-links li .text {
+        transition: opacity 0.3s, width 0.3s;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    /* 縮合狀態 */
     .dashboard-container.sidebar-collapsed .sidebar {
         width: 70px;
     }
 
-    .dashboard-container.sidebar-collapsed .sidebar-header h3,
-    .dashboard-container.sidebar-collapsed .nav-links li span:not(.icon) {
+    .dashboard-container.sidebar-collapsed .sidebar-header h3 {
         display: none;
     }
-    
-    .dashboard-container.sidebar-collapsed .nav-links li {
+
+    .dashboard-container.sidebar-collapsed .sidebar-header {
+        padding: 1rem 0.5rem;
         text-align: center;
-        padding: 1rem 0;
+    }
+
+    .dashboard-container.sidebar-collapsed .sidebar-header::after {
+        content: '☰';
+        font-size: 1.5rem;
+        color: #fff;
+    }
+
+    .dashboard-container.sidebar-collapsed .nav-links li .text {
+        opacity: 0;
+        width: 0;
+    }
+
+    .dashboard-container.sidebar-collapsed .nav-links li {
         justify-content: center;
+        padding: 1rem 0;
         border-left-width: 0;
-        border-bottom: 4px solid transparent;
-        display: flex;
-        align-items: center;
     }
-    
+
     .dashboard-container.sidebar-collapsed .nav-links li.active {
-        border-bottom: 4px solid var(--accent);
+        border-left: 0;
         background: rgba(255, 255, 255, 0.1);
+        border-bottom: 3px solid var(--accent);
     }
-    
+
     .dashboard-container.sidebar-collapsed .sidebar-footer button {
-        padding: 8px 0;
-        font-size: 0.8rem;
+        padding: 8px 5px;
+        font-size: 0;
+    }
+
+    .dashboard-container.sidebar-collapsed .sidebar-footer button::after {
+        content: '🚪';
+        font-size: 1.2rem;
+    }
+
+    .dashboard-container.sidebar-collapsed .sidebar-collapse-btn {
+        right: -14px;
     }
 }
