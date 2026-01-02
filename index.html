@@ -508,9 +508,13 @@
                         <input type="hidden" id="prodImage">
                     </div>
                     <div class="form-group">
-                        <label>規格設定 (JSON 格式)</label>
-                        <textarea id="prodOptions" rows="2"
-                            placeholder='{"顏色": ["紅", "藍"], "尺寸": ["S", "M"]}'></textarea>
+                        <label>規格設定</label>
+                        <div id="specBuilderContainer" class="spec-builder-container">
+                            <!-- 動態產生規格輸入列 -->
+                        </div>
+                        <button type="button" class="btn-small" onclick="addSpecGroup()" style="margin-top: 5px;">
+                            + 新增規格類別 (例如：顏色、尺寸)
+                        </button>
                     </div>
                 </div> <!-- End modal-body -->
 
