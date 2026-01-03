@@ -261,14 +261,14 @@ const PageRenderer = {
                 ${useCarousel ? `
                     <div class="products-carousel-wrapper">
                         <button class="carousel-nav prev" onclick="PageRenderer.scrollCarousel(this, -1)">‹</button>
-                        <div class="products-carousel">
-                            <div class="loading">載入商品中...</div>
+                    <div class="products-carousel">
+                            <div class="loading-spinner">商品載入中，請稍等</div>
                         </div>
                         <button class="carousel-nav next" onclick="PageRenderer.scrollCarousel(this, 1)">›</button>
                     </div>
                 ` : `
                     <div class="products-grid">
-                        <div class="loading">載入商品中...</div>
+                        <div class="loading-spinner">商品載入中，請稍等</div>
                     </div>
                 `}
             </div>
