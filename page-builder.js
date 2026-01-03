@@ -453,6 +453,9 @@ const PageBuilder = {
             this.addInnerField(container, '區塊標題', 'title', comp.title);
             // 分類導覽目前是自動抓取的，不需要編輯具體分類
         }
+
+        // 新增：每個區塊編輯器底部都加上確認按鈕
+        this.addUpdateBtn(container);
     },
 
     renderFooterForm: function (container) {
@@ -499,6 +502,9 @@ const PageBuilder = {
         (this.footer.notices || []).forEach((notice, idx) => {
             this.renderNoticeItem(noticesContainer, notice, idx);
         });
+
+        // 新增：頁尾編輯器底部加上確認按鈕
+        this.addUpdateBtn(container);
     },
 
     renderNoticeItem: function (container, notice, idx) {
@@ -712,20 +718,41 @@ const PageBuilder = {
 
         input.value = value || '';
 
-        // 使用 debounce 避免閃爍
+        // 取消自動預覽更新，改為手動
         input.oninput = (e) => {
             this.layout[this.editingIndex][key] = type === 'number' ? parseInt(e.target.value) || 0 : e.target.value;
-            this.debouncedPreviewUpdate();
+            // this.debouncedPreviewUpdate(); // Disabled
         };
 
         div.appendChild(input);
         container.appendChild(div);
     },
 
-    // 防閃爍：延遲更新預覽
+    // 新增確認修改按鈕的 Helper (用於 Inline Form 底部)
+    addUpdateBtn: function (container) {
+        const btnDiv = document.createElement('div');
+        btnDiv.style.cssText = 'margin-top: 20px; text-align: right; border-top: 1px solid #eee; padding-top: 15px;';
+
+        const btn = document.createElement('button');
+        btn.textContent = '確認修改 (重新預覽)';
+        btn.className = 'save-btn'; // 重用 save-btn 樣式
+        btn.style.cssText = 'padding: 8px 15px; font-size: 14px; background: #666; width: auto;';
+
+        btn.onclick = () => {
+            this.renderPreview();
+            this.highlightPreview(this.editingIndex);
+            showToast('預覽已更新');
+        };
+
+        btnDiv.appendChild(btn);
+        container.appendChild(btnDiv);
+    },
+
+    // 防閃爍：延遲更新預覽 (保留函數但現在主要由按鈕觸發)
     debouncedPreviewUpdate: function () {
-        clearTimeout(this.debounceTimer);
-        this.debounceTimer = setTimeout(() => this.renderPreview(), 300);
+        // Auto-preview disabled as per user request
+        // clearTimeout(this.debounceTimer);
+        // this.debounceTimer = setTimeout(() => this.renderPreview(), 300);
     },
 
     saveLayout: async function () {
